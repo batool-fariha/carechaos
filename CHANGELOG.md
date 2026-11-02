@@ -1,0 +1,13 @@
+# Changelog
+
+## 0.1.0 — MVP
+
+- Deterministic, event-driven simulation engine with a virtual clock and seeded PRNG.
+- Six-stage synthetic pipeline: device → ingestion → processor → alert rules → delivery → clinician dashboard.
+- Fault injection: latency, duplicate delivery, service outage, packet loss, out-of-order delivery, recovery backlog.
+- Resilient mode (idempotency, bounded retries, durable queue + dead-letter redrive, stale-data flags, gap detection) and a documented faulty reference mode.
+- Seven scenarios with hypotheses and assertions that can fail.
+- Metrics with explicit denominators; failure-mode detection; evidence-based recommendations.
+- Dashboard, topology view, live fault injection, manual recovery, experiment form, results page with baseline/mode comparison.
+- SQLite experiment history (Node built-in `node:sqlite`), JSON (schema 1.0) and Markdown report export.
+- Vitest unit/integration tests and Playwright end-to-end tests.

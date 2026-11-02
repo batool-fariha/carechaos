@@ -1,0 +1,396 @@
+{
+  "schemaVersion": "1.0",
+  "generator": {
+    "name": "CareChaos",
+    "appVersion": "0.1.0",
+    "engineVersion": "1"
+  },
+  "experimentId": "exp_sample",
+  "runTimestamp": "2026-01-01T00:00:00.000Z",
+  "runStatus": "completed",
+  "verdict": "failed",
+  "scenario": {
+    "id": "alert-service-outage",
+    "name": "Alert service outage",
+    "hypothesis": "If the alert service becomes unavailable, events remain queued and are processed after recovery, within the configured limits."
+  },
+  "seed": 42,
+  "resilienceMode": "faulty",
+  "configuration": {
+    "name": "Alert service outage",
+    "scenarioId": "alert-service-outage",
+    "seed": 42,
+    "eventCount": 200,
+    "intervalSec": 1,
+    "durationSec": 300,
+    "mode": "faulty",
+    "drainCapacityPerSec": 5,
+    "patientCount": 4,
+    "staleThresholdSec": 10,
+    "faults": [
+      {
+        "startSec": 60,
+        "durationSec": 60,
+        "intensity": 0.1,
+        "delaySec": 0,
+        "type": "outage",
+        "target": "delivery"
+      }
+    ],
+    "interventions": []
+  },
+  "injectedFaults": [
+    {
+      "startSec": 60,
+      "durationSec": 60,
+      "intensity": 0.1,
+      "delaySec": 0,
+      "type": "outage",
+      "target": "delivery",
+      "source": "scenario"
+    }
+  ],
+  "eventCounts": {
+    "generated": 200,
+    "processed": 200,
+    "alertsExpected": 26,
+    "alertsDelivered": 14,
+    "duplicatesInjected": 0,
+    "duplicatesRejected": 0,
+    "duplicatesAccepted": 0,
+    "dropped": 12,
+    "deadLettered": 0,
+    "status_processed": 174,
+    "status_delivered": 14,
+    "status_dropped": 12
+  },
+  "metrics": {
+    "readingsGenerated": 200,
+    "readingsProcessed": 200,
+    "alertsExpected": 26,
+    "alertsDelivered": 14,
+    "duplicatesInjected": 0,
+    "duplicatesRejected": 0,
+    "duplicatesAccepted": 0,
+    "duplicateAlertsDelivered": 0,
+    "eventsDropped": 12,
+    "eventsDeadLettered": 0,
+    "staleFlagged": 0,
+    "staleOverwrites": 0,
+    "lateArrivals": 0,
+    "reorderedReadings": 0,
+    "deliveryRate": {
+      "value": 0.5384615384615384,
+      "numerator": 14,
+      "denominator": 26,
+      "label": "expected alerts delivered ÷ alerts expected"
+    },
+    "processingSuccessRate": {
+      "value": 1,
+      "numerator": 200,
+      "denominator": 200,
+      "label": "unique readings processed ÷ readings generated minus intentionally dropped"
+    },
+    "duplicateRejectionRate": {
+      "value": null,
+      "numerator": 0,
+      "denominator": 0,
+      "label": "duplicates rejected ÷ duplicates injected",
+      "note": "No duplicates were injected."
+    },
+    "readingLatency": {
+      "n": 200,
+      "medianSec": 0,
+      "p95Sec": 0,
+      "maxSec": 0,
+      "basis": "event (generation) time → processed time, per unique reading"
+    },
+    "alertLatency": {
+      "n": 14,
+      "medianSec": 0,
+      "p95Sec": null,
+      "maxSec": 0,
+      "basis": "event (generation) time → delivered-to-dashboard time, per unique alert",
+      "note": "p95 omitted: needs at least 20 samples (have 14)."
+    },
+    "recoveries": [
+      {
+        "service": "delivery",
+        "initiatedAt": 120,
+        "completedAt": 122,
+        "trigger": "automatic",
+        "durationSec": 2
+      }
+    ],
+    "recoveryTimeSec": 2,
+    "recoveryIncomplete": false,
+    "readingLoss": {
+      "total": 0,
+      "intentional": 0,
+      "pending": 0,
+      "unexpected": 0,
+      "byReason": {}
+    },
+    "alertLoss": {
+      "total": 12,
+      "intentional": 0,
+      "pending": 0,
+      "unexpected": 12,
+      "byReason": {
+        "target_unavailable": 12
+      }
+    },
+    "peakQueueDepth": 1,
+    "peakQueueService": "device",
+    "finalQueueDepth": 0,
+    "outcomes": {
+      "processed": 174,
+      "delivered": 14,
+      "dropped": 12
+    },
+    "assertionPassRate": {
+      "value": 0.625,
+      "numerator": 5,
+      "denominator": 8,
+      "label": "assertions passed ÷ applicable assertions"
+    }
+  },
+  "assertions": [
+    {
+      "id": "unavailable",
+      "kind": "service_unavailable_during_fault",
+      "title": "The service is marked unavailable during the fault",
+      "status": "passed",
+      "expected": "target service is marked unavailable when the outage starts",
+      "actual": "delivery unavailable at 60s",
+      "eventIds": []
+    },
+    {
+      "id": "no-delivery",
+      "kind": "no_work_during_outage",
+      "title": "No alert is reported as delivered while the service is unavailable",
+      "status": "passed",
+      "expected": "no work attributed to the target service while it is unavailable (delivery)",
+      "actual": "0 events handled during the outage",
+      "eventIds": []
+    },
+    {
+      "id": "queued",
+      "kind": "queue_visible_during_outage",
+      "title": "Queued events are visible during the outage",
+      "status": "failed",
+      "expected": "queued events visible for delivery (peak depth ≥ 1)",
+      "actual": "peak depth 0 during the outage",
+      "eventIds": []
+    },
+    {
+      "id": "after-recovery",
+      "kind": "processed_after_recovery",
+      "title": "Queued events are delivered after recovery",
+      "status": "failed",
+      "expected": "all 12 alerts generated during the outage are delivered after recovery",
+      "actual": "0/12 completed",
+      "eventIds": [
+        "evt-00064",
+        "evt-00065",
+        "evt-00068",
+        "evt-00081",
+        "evt-00083",
+        "evt-00085",
+        "evt-00089",
+        "evt-00105",
+        "evt-00110",
+        "evt-00112",
+        "evt-00114",
+        "evt-00115"
+      ]
+    },
+    {
+      "id": "recovery-time",
+      "kind": "recovery_time_max",
+      "title": "Recovery completes within 60s",
+      "status": "passed",
+      "expected": "recovery completes within 60s of restoration",
+      "actual": "2s (restore → backlog drained)",
+      "eventIds": []
+    },
+    {
+      "id": "drains",
+      "kind": "queue_drains",
+      "title": "Queues are fully drained by the end of the window",
+      "status": "passed",
+      "expected": "all queues, retry holds and dead-letter queues empty at end of window",
+      "actual": "0 events still queued/held/dead-lettered",
+      "eventIds": []
+    },
+    {
+      "id": "accounted",
+      "kind": "accounted_for",
+      "title": "No event is silently lost: every reading is processed or has a recorded loss reason",
+      "status": "passed",
+      "expected": "every generated reading is processed, or lost/pending with a recorded reason (processed + lost + pending = generated)",
+      "actual": "200 processed + 0 lost/pending = 200 of 200 generated; 0 without a reason",
+      "eventIds": []
+    },
+    {
+      "id": "no-unexpected-loss",
+      "kind": "no_unexpected_loss",
+      "title": "No readings or alerts are lost for reasons other than the injected fault",
+      "status": "failed",
+      "expected": "0 events lost for reasons other than injected packet loss",
+      "actual": "12 unexpected losses (target_unavailable: 12)",
+      "eventIds": [
+        "evt-00064",
+        "evt-00065",
+        "evt-00068",
+        "evt-00081",
+        "evt-00083",
+        "evt-00085",
+        "evt-00089",
+        "evt-00105",
+        "evt-00110",
+        "evt-00112",
+        "evt-00114",
+        "evt-00115"
+      ]
+    }
+  ],
+  "recoveryTimeline": [
+    {
+      "t": 60,
+      "kind": "fault_started",
+      "service": "delivery",
+      "detail": "Outage fault: delivery unavailable for 60s."
+    },
+    {
+      "t": 60,
+      "kind": "service_state",
+      "service": "delivery",
+      "detail": "delivery: healthy → unavailable (outage fault active)."
+    },
+    {
+      "t": 120,
+      "kind": "fault_ended",
+      "service": "delivery",
+      "detail": "outage fault on delivery ended."
+    },
+    {
+      "t": 120,
+      "kind": "recovery_initiated",
+      "service": "delivery",
+      "detail": "delivery restored (automatic); draining backlog at 5/s."
+    },
+    {
+      "t": 120,
+      "kind": "service_state",
+      "service": "delivery",
+      "detail": "delivery: unavailable → recovering (draining backlog after restore)."
+    },
+    {
+      "t": 122,
+      "kind": "recovery_completed",
+      "service": "delivery",
+      "detail": "delivery recovered: backlog drained and service healthy."
+    },
+    {
+      "t": 122,
+      "kind": "service_state",
+      "service": "delivery",
+      "detail": "delivery: recovering → healthy (recovery condition met (queue drained))."
+    }
+  ],
+  "relevantEventIds": {
+    "assertion:after-recovery": [
+      "evt-00064",
+      "evt-00065",
+      "evt-00068",
+      "evt-00081",
+      "evt-00083",
+      "evt-00085",
+      "evt-00089",
+      "evt-00105",
+      "evt-00110",
+      "evt-00112",
+      "evt-00114",
+      "evt-00115"
+    ],
+    "assertion:no-unexpected-loss": [
+      "evt-00064",
+      "evt-00065",
+      "evt-00068",
+      "evt-00081",
+      "evt-00083",
+      "evt-00085",
+      "evt-00089",
+      "evt-00105",
+      "evt-00110",
+      "evt-00112",
+      "evt-00114",
+      "evt-00115"
+    ],
+    "failure_mode:dropped-on-unavailable": [
+      "evt-00064",
+      "evt-00065",
+      "evt-00068",
+      "evt-00081",
+      "evt-00083",
+      "evt-00085",
+      "evt-00089",
+      "evt-00105",
+      "evt-00110",
+      "evt-00112",
+      "evt-00114",
+      "evt-00115"
+    ]
+  },
+  "failureModes": [
+    {
+      "id": "dropped-on-unavailable",
+      "title": "Events dropped while a downstream service was unavailable",
+      "evidence": "12 events were dropped with reason target_unavailable because the sender had no retry or buffer.",
+      "eventIds": [
+        "evt-00064",
+        "evt-00065",
+        "evt-00068",
+        "evt-00081",
+        "evt-00083",
+        "evt-00085",
+        "evt-00089",
+        "evt-00105",
+        "evt-00110",
+        "evt-00112",
+        "evt-00114",
+        "evt-00115"
+      ]
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "rec-dropped-on-unavailable",
+      "title": "Buffer or retry instead of dropping",
+      "evidence": "12 events were dropped with reason target_unavailable because the sender had no retry or buffer.",
+      "eventIds": [
+        "evt-00064",
+        "evt-00065",
+        "evt-00068",
+        "evt-00081",
+        "evt-00083",
+        "evt-00085",
+        "evt-00089",
+        "evt-00105",
+        "evt-00110",
+        "evt-00112",
+        "evt-00114",
+        "evt-00115"
+      ],
+      "action": "Add a durable queue or bounded retry with backoff on the sender so a short outage does not become permanent data loss."
+    }
+  ],
+  "limitations": [
+    "All data is synthetic and fictional. Readings are not medical observations.",
+    "Alert thresholds are illustrative demo values and are not medically validated.",
+    "Results describe a simulated pipeline model, not any real product or company's infrastructure.",
+    "A passing experiment does not establish clinical safety or regulatory compliance.",
+    "Time is virtual; latencies are model outputs, not real-world performance measurements."
+  ]
+}
