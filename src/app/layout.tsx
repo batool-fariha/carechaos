@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
         <footer className="mx-auto max-w-7xl border-t border-line px-4 py-6 text-xs leading-relaxed text-mute">
-          CareChaos is a developer and educational simulator. All patients, devices and readings are fictional. It is not a clinical decision-support system, and a passing experiment does not establish clinical safety or regulatory compliance.
+          <a href="/settings" className="mr-3 underline">About &amp; settings</a>CareChaos is a developer and educational simulator. All patients, devices and readings are fictional. It is not a clinical decision-support system, and a passing experiment does not establish clinical safety or regulatory compliance.
         </footer>
       </body>
     </html>

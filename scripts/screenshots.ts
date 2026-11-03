@@ -7,7 +7,7 @@ mkdirSync("docs/img", { recursive: true });
 async function main() {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1360, height: 900 }, deviceScaleFactor: 2 });
-await page.goto(base);
+await page.goto(`${base}/lab`);
 await page.getByLabel("Playback speed").selectOption({ label: "10×" });
 await page.getByTestId("run-demo").click();
 await page.getByTestId("node-delivery").and(page.locator('[data-health="unavailable"]')).waitFor();

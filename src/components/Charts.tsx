@@ -5,8 +5,8 @@ import { SERVICE_IDS, type Health, type ServiceId, type Sample, type SimulationR
 import { HEALTH_META, SERVICE_SHORT } from "@/lib/format";
 import { Card, Empty } from "./ui";
 
-const axis = { stroke: "#6b7683", fontSize: 11 } as const;
-const tooltipStyle = { background: "#12161c", border: "1px solid #252c36", borderRadius: 6, fontSize: 12 };
+const axis = { stroke: "#6b7280", fontSize: 11 } as const;
+const tooltipStyle = { background: "#ffffff", border: "1px solid #dfe3e8", borderRadius: 6, fontSize: 12 };
 
 function useMounted() {
   const [m, setM] = useState(false);
@@ -32,11 +32,11 @@ export function QueueChart({ samples }: { samples: Sample[] }) {
   return (
     <ChartBox title="Queue depth over time" empty={samples.length < 2} caption="Events queued, held for retry, or dead-lettered, summed across services (virtual seconds).">
       <AreaChart data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid stroke="#252c36" strokeDasharray="3 3" />
+        <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="t" {...axis} tickFormatter={(v) => `${Math.round(v)}s`} />
         <YAxis {...axis} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} labelFormatter={(v) => `t = ${v}s`} />
-        <Area type="stepAfter" dataKey="totalDepth" name="Queue depth" stroke="#f5b13d" fill="#f5b13d" fillOpacity={0.2} isAnimationActive={false} />
+        <Area type="stepAfter" dataKey="totalDepth" name="Queue depth" stroke="#b45309" fill="#b45309" fillOpacity={0.2} isAnimationActive={false} />
       </AreaChart>
     </ChartBox>
   );
@@ -46,11 +46,11 @@ export function LatencyChart({ samples }: { samples: Sample[] }) {
   return (
     <ChartBox title="Latency over time" empty={samples.length < 2} caption="Mean event-time → processed-time latency of readings processed in each virtual second.">
       <LineChart data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid stroke="#252c36" strokeDasharray="3 3" />
+        <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="t" {...axis} tickFormatter={(v) => `${Math.round(v)}s`} />
         <YAxis {...axis} unit="s" />
         <Tooltip contentStyle={tooltipStyle} labelFormatter={(v) => `t = ${v}s`} formatter={(v) => (typeof v === "number" ? `${v.toFixed(2)}s` : v)} />
-        <Line type="monotone" dataKey="latencySec" name="Mean latency" stroke="#2dd4bf" dot={false} strokeWidth={2} isAnimationActive={false} connectNulls={false} />
+        <Line type="monotone" dataKey="latencySec" name="Mean latency" stroke="#0b6b63" dot={false} strokeWidth={2} isAnimationActive={false} connectNulls={false} />
       </LineChart>
     </ChartBox>
   );
@@ -60,14 +60,14 @@ export function OutcomeChart({ samples }: { samples: Sample[] }) {
   return (
     <ChartBox title="Successful vs failed events" empty={samples.length < 2} caption="Cumulative unique events. Failed = dropped or dead-lettered at the time of sampling.">
       <LineChart data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid stroke="#252c36" strokeDasharray="3 3" />
+        <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="t" {...axis} tickFormatter={(v) => `${Math.round(v)}s`} />
         <YAxis {...axis} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} labelFormatter={(v) => `t = ${v}s`} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Line type="monotone" dataKey="processed" name="Processed" stroke="#2dd4bf" dot={false} strokeWidth={2} isAnimationActive={false} />
-        <Line type="monotone" dataKey="delivered" name="Alerts delivered" stroke="#e7ebf0" strokeDasharray="5 3" dot={false} strokeWidth={2} isAnimationActive={false} />
-        <Line type="monotone" dataKey="failed" name="Failed" stroke="#f4616a" strokeDasharray="2 3" dot={false} strokeWidth={2} isAnimationActive={false} />
+        <Line type="monotone" dataKey="processed" name="Processed" stroke="#0b6b63" dot={false} strokeWidth={2} isAnimationActive={false} />
+        <Line type="monotone" dataKey="delivered" name="Alerts delivered" stroke="#14181f" strokeDasharray="5 3" dot={false} strokeWidth={2} isAnimationActive={false} />
+        <Line type="monotone" dataKey="failed" name="Failed" stroke="#b91c1c" strokeDasharray="2 3" dot={false} strokeWidth={2} isAnimationActive={false} />
       </LineChart>
     </ChartBox>
   );
@@ -91,18 +91,18 @@ export function HealthStrip({ result }: { result: SimulationResult }) {
           <svg viewBox={`0 0 ${W + 90} ${SERVICE_IDS.length * (rowH + 4) + 18}`} className="w-full" role="img" aria-label="Service health over time">
             <defs>
               <pattern id="hs-deg" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                <rect width="5" height="5" fill="#f5b13d" />
-                <rect width="2" height="5" fill="#12161c" />
+                <rect width="5" height="5" fill="#b45309" />
+                <rect width="2" height="5" fill="#ffffff" />
               </pattern>
               <pattern id="hs-rec" width="5" height="5" patternUnits="userSpaceOnUse">
-                <rect width="5" height="5" fill="#12161c" />
-                <circle cx="2.5" cy="2.5" r="1.4" fill="#f5b13d" />
+                <rect width="5" height="5" fill="#ffffff" />
+                <circle cx="2.5" cy="2.5" r="1.4" fill="#b45309" />
               </pattern>
             </defs>
             {mounted &&
               SERVICE_IDS.map((id, r) => (
                 <g key={id} transform={`translate(0 ${r * (rowH + 4)})`}>
-                  <text x={0} y={rowH - 5} fontSize="10.5" fill="#98a2b0">
+                  <text x={0} y={rowH - 5} fontSize="10.5" fill="#5b6572">
                     {SERVICE_SHORT[id]}
                   </text>
                   {Array.from({ length: cols }, (_, c) => {
@@ -111,10 +111,10 @@ export function HealthStrip({ result }: { result: SimulationResult }) {
                   })}
                 </g>
               ))}
-            <text x={90} y={SERVICE_IDS.length * (rowH + 4) + 12} fontSize="10" fill="#6b7683">
+            <text x={90} y={SERVICE_IDS.length * (rowH + 4) + 12} fontSize="10" fill="#6b7280">
               0s
             </text>
-            <text x={90 + W} y={SERVICE_IDS.length * (rowH + 4) + 12} fontSize="10" fill="#6b7683" textAnchor="end">
+            <text x={90 + W} y={SERVICE_IDS.length * (rowH + 4) + 12} fontSize="10" fill="#6b7280" textAnchor="end">
               {Math.round(samples[samples.length - 1].t)}s
             </text>
           </svg>
@@ -122,7 +122,7 @@ export function HealthStrip({ result }: { result: SimulationResult }) {
             {(["healthy", "degraded", "recovering", "unavailable"] as Health[]).map((h) => (
               <li key={h} className="flex items-center gap-1.5">
                 <svg width="14" height="14" aria-hidden>
-                  <rect width="14" height="14" rx="2" fill={fillFor(h)} stroke="#252c36" />
+                  <rect width="14" height="14" rx="2" fill={fillFor(h)} stroke="#dfe3e8" />
                 </svg>
                 <span className={HEALTH_META[h].text}>{HEALTH_META[h].glyph}</span> {HEALTH_META[h].label}
               </li>
@@ -135,7 +135,7 @@ export function HealthStrip({ result }: { result: SimulationResult }) {
 }
 
 function fillFor(h: Health): string {
-  return h === "healthy" ? "#1f6f66" : h === "degraded" ? "url(#hs-deg)" : h === "recovering" ? "url(#hs-rec)" : "#f4616a";
+  return h === "healthy" ? "#8fd0c6" : h === "degraded" ? "url(#hs-deg)" : h === "recovering" ? "url(#hs-rec)" : "#b91c1c";
 }
 
 export function HistogramChart({ title, values, caption }: { title: string; values: number[]; caption?: string }) {
@@ -143,11 +143,11 @@ export function HistogramChart({ title, values, caption }: { title: string; valu
   return (
     <ChartBox title={title} empty={values.length === 0} caption={caption}>
       <BarChart data={bins} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid stroke="#252c36" strokeDasharray="3 3" />
+        <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="label" {...axis} interval="preserveStartEnd" />
         <YAxis {...axis} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} />
-        <Bar dataKey="count" name="Events" fill="#2dd4bf" isAnimationActive={false} />
+        <Bar dataKey="count" name="Events" fill="#0b6b63" isAnimationActive={false} />
       </BarChart>
     </ChartBox>
   );

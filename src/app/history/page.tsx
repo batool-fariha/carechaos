@@ -28,7 +28,7 @@ export default async function History() {
         <Empty>
           <div>
             No experiments yet.{" "}
-            <Link href="/" className="text-teal underline">Run the demo</Link> or <Link href="/experiments/new" className="text-teal underline">create an experiment</Link>.
+            <Link href="/lab?autostart=1" className="text-teal underline">Run the demo</Link> or <Link href="/experiments/new" className="text-teal underline">create an experiment</Link>.
           </div>
         </Empty>
       )}

@@ -5,12 +5,31 @@ async function setSpeed(page: Page, label: string) {
   await page.getByLabel("Playback speed").selectOption({ label });
 }
 
-test("dashboard opens with a preconfigured demo and empty states", async ({ page }) => {
+test("landing page explains the product and the demo button opens the lab running", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("See what breaks");
+  await expect(page.getByRole("img", { name: /A reading flows from a device/ })).toBeVisible();
+  await page.getByTestId("landing-demo").click();
+  await page.waitForURL(/\/lab\?autostart=1/);
+  await expect(page.getByTestId("run-state")).toHaveAttribute("data-state", /running|completed/);
+  await expect(page.getByTestId("story-headline")).not.toHaveText("Ready to run");
+});
+
+test("the narrator describes an outage in plain language", async ({ page }) => {
+  await page.goto("/lab");
+  await page.getByLabel("Playback speed").selectOption({ label: "10×" });
+  await page.getByTestId("run-demo").click();
+  await expect(page.getByTestId("story-headline")).toHaveText("Delivery Service is down");
+  await expect(page.getByTestId("narrator")).toContainText("retried");
+  await expect(page.getByTestId("story-headline")).toHaveText(/is back|healthy|finished/);
+});
+
+test("lab opens with a preconfigured demo and empty states", async ({ page }) => {
+  await page.goto("/lab");
   await expect(page.getByRole("heading", { name: "Reliability Lab" })).toBeVisible();
   await expect(page.getByTestId("run-demo")).toBeEnabled();
   await expect(page.getByTestId("run-state")).toHaveAttribute("data-state", "idle");
-  await expect(page.getByText("No events yet").first()).toBeVisible();
+  await expect(page.getByTestId("story-headline")).toHaveText("Ready to run");
   await expect(page.getByTestId("m-generated")).toContainText("—");
   for (const id of ["device", "ingestion", "processor", "rules", "delivery", "dashboard"]) {
     await expect(page.getByTestId(`node-${id}`)).toHaveAttribute("data-health", "healthy");
@@ -18,7 +37,7 @@ test("dashboard opens with a preconfigured demo and empty states", async ({ page
 });
 
 test("run demo: service state changes, recovery is observed, results are saved and exportable", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   await setSpeed(page, "10×");
   await page.getByTestId("run-demo").click();
   await expect(page.getByTestId("run-state")).toHaveAttribute("data-state", "running");
@@ -54,7 +73,7 @@ test("run demo: service state changes, recovery is observed, results are saved a
 });
 
 test("inject a failure live, recover it manually, then stop and reset", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   await page.getByTestId("scenario-select").selectOption({ label: "Healthy baseline" });
   await setSpeed(page, "10×");
   await page.getByTestId("run-demo").click();
@@ -91,7 +110,7 @@ test("inject a failure live, recover it manually, then stop and reset", async ({
 });
 
 test("faulty reference mode fails assertions that resilient mode passes", async ({ page }) => {
-  await page.goto("/?scenario=duplicate-events&mode=faulty");
+  await page.goto("/lab?scenario=duplicate-events&mode=faulty");
   await page.getByTestId("run-demo").click();
   await page.getByTestId("ctl-skip").click();
   await expect(page.getByTestId("run-state")).toHaveAttribute("data-state", "completed");
@@ -131,7 +150,7 @@ test("scenario library lists all scenarios and navigation works", async ({ page 
   await page.getByRole("link", { name: "Open in lab" }).first().click();
   await expect(page.getByTestId("run-demo")).toBeVisible();
   await page.getByRole("link", { name: "About" }).click();
-  await expect(page.getByText("not a clinical decision-support system", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /About/ })).toBeVisible();
 });
 
 test("combine multiple faults in one experiment", async ({ page }) => {

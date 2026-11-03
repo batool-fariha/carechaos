@@ -27,8 +27,8 @@ export default function Scenarios() {
               </div>
               <p><b>Relevant metrics:</b> <span className="text-mute">{s.relevantMetrics.join(" · ")}</span></p>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Link href={`/?scenario=${s.id}`} className={linkButtonClass("primary")}>Open in lab</Link>
-                <Link href={`/?scenario=${s.id}&mode=faulty`} className={linkButtonClass()}>Open faulty reference</Link>
+                <Link href={`/lab?scenario=${s.id}`} className={linkButtonClass("primary")}>Open in lab</Link>
+                <Link href={`/lab?scenario=${s.id}&mode=faulty`} className={linkButtonClass()}>Open weak system</Link>
                 <Link href={`/experiments/new?scenario=${s.id}`} className={linkButtonClass()}>Customize</Link>
               </div>
             </div>

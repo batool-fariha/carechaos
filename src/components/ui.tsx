@@ -92,3 +92,19 @@ export function Field({ label, hint, error, children, htmlFor }: { label: string
 
 export const inputClass =
   "w-full rounded-md border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-gray focus:border-teal focus:outline-none";
+
+/** Collapsed-by-default section used to keep secondary detail out of the way. */
+export function Disclosure({ title, hint, children, testId, defaultOpen = false }: { title: string; hint?: string; children: ReactNode; testId?: string; defaultOpen?: boolean }) {
+  return (
+    <details open={defaultOpen} className="group rounded-lg border border-line bg-panel" data-testid={testId}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+        <span>
+          {title}
+          {hint && <span className="ml-2 font-normal text-mute">{hint}</span>}
+        </span>
+        <span aria-hidden className="text-mute transition-transform group-open:rotate-180">⌄</span>
+      </summary>
+      <div className="border-t border-line p-4">{children}</div>
+    </details>
+  );
+}
