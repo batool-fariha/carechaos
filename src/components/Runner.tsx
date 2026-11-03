@@ -8,6 +8,7 @@ import { SPEEDS, useSimulation } from "@/lib/useSimulation";
 import { HealthStrip, LatencyChart, OutcomeChart, QueueChart } from "./Charts";
 import { EventStream } from "./EventStream";
 import { FaultInjector } from "./FaultInjector";
+import { GuideSteps } from "./GuideSteps";
 import { HeadlineMetrics, MoreMetrics } from "./MetricsGrid";
 import { ServiceDetails } from "./ServiceDetails";
 import { Topology } from "./Topology";
@@ -165,6 +166,7 @@ export function Runner({ initialConfig, experimentId, startLabel = "Run demo", s
         <div className="mt-4 h-1.5 overflow-hidden rounded bg-line" role="progressbar" aria-label="Simulation progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
           <div className="h-full bg-teal transition-all" style={{ width: `${progress * 100}%` }} />
         </div>
+        <GuideSteps result={result} />
         {live && down.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-3" data-testid="outage-banner">
             {down.map((s) => (

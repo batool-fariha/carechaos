@@ -6,7 +6,7 @@ import type { ExperimentRow } from "@/lib/db";
 import { fmtPct } from "@/lib/format";
 import { Button, Pill } from "./ui";
 
-export function HistoryTable({ rows }: { rows: ExperimentRow[] }) {
+export function HistoryTable({ rows }: { rows: Omit<ExperimentRow, "owner">[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   async function remove(id: string) {

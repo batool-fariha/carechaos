@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { HistoryTable } from "@/components/HistoryTable";
 import { Empty, linkButtonClass } from "@/components/ui";
-import { listExperiments, type ExperimentRow } from "@/lib/db";
+import { listExperiments, publicRow, type ExperimentRow } from "@/lib/db";
+import { getOwner } from "@/lib/owner";
 
 export const dynamic = "force-dynamic";
 
 export default async function History() {
-  let rows: ExperimentRow[] = [];
+  let rows: Omit<ExperimentRow, "owner">[] = [];
   let error: string | null = null;
   try {
-    rows = await listExperiments();
+    const owner = await getOwner();
+    rows = owner ? (await listExperiments(owner)).map(publicRow) : [];
   } catch (e) {
     console.error(JSON.stringify({ level: "error", msg: "history load failed", error: String(e) }));
     error = "Experiment storage is unavailable, so history can't be shown. The simulator itself still works.";

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Share links: "Copy share link" on results; unique page titles and an Open Graph preview image.
+- Guided four-step tracker in the lab.
+- Per-browser history ownership (anonymous cookie); edit and delete are owner-only; rate-limited writes; `/api/health`.
+- New logo and favicon; credits footer; working GitHub links; error page.
+- Documentation overhaul: README, API, security, deployment; issue and PR templates, security policy, code of conduct.
+
 - Light theme, landing page at `/` with a pipeline diagram, lab moved to `/lab`.
 - Plain-language narrator banner; secondary numbers, charts, injector and event log are collapsed by default.
 - Headless scenario runner (`npm run scenarios`) with CI exit codes and report output; GitHub Actions workflow.

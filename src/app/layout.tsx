@@ -4,6 +4,9 @@ import { Nav } from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://carechaos.vercel.app"),
+  openGraph: { type: "website", siteName: "CareChaos", title: "CareChaos: chaos engineering for patient-monitoring software", description: "Break a simulated patient-monitoring pipeline on purpose and see whether alerts still reach the clinician." },
+  twitter: { card: "summary_large_image" },
   title: "CareChaos — chaos engineering for remote patient-monitoring software",
   description: "A simulation-only reliability lab. Inject failures into a synthetic patient-monitoring pipeline and inspect what happens to readings and alerts.",
 };

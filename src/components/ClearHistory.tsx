@@ -8,16 +8,16 @@ export function ClearHistory() {
   async function go() {
     const res = await fetch("/api/experiments", { method: "DELETE" });
     const data = await res.json();
-    setMsg(res.ok ? `Deleted ${data.deleted} stored experiment(s).` : data.error);
+    setMsg(res.ok ? `Deleted ${data.deleted} of your stored experiment(s).` : data.error);
     setConfirming(false);
   }
   return (
     <div className="space-y-2">
       {!confirming ? (
-        <Button variant="danger" onClick={() => setConfirming(true)} data-testid="clear-history">Delete all experiment history</Button>
+        <Button variant="danger" onClick={() => setConfirming(true)} data-testid="clear-history">Delete my experiment history</Button>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="text-sm">This permanently deletes all stored experiments.</span>
+          <span className="text-sm">This permanently deletes the experiments saved from this browser.</span>
           <Button variant="danger" onClick={go} data-testid="confirm-clear">Yes, delete</Button>
           <Button onClick={() => setConfirming(false)}>Cancel</Button>
         </div>

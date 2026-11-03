@@ -39,6 +39,14 @@ stateDiagram-v2
 * Persistence: `node:sqlite` (`src/lib/db.ts`), `CARECHAOS_DB_PATH` (default `data/carechaos.db`). If storage fails the simulator still works and the UI says so.
 * UI primitives in `src/components/ui.tsx` follow shadcn/ui conventions (variants, tokens) but are hand-written to avoid pulling Radix into an MVP.
 
+## Narrator and guide
+
+`src/lib/narrate.ts` turns engine state into one plain-language sentence (for example “Delivery Service is down. 7 messages are waiting…”). `GuideSteps` tracks four stages (failure starts, impact appears, system recovers, verdict) from the run's real timeline. Neither adds any state of its own.
+
+## Ownership and storage
+
+Experiments are stored by a storage adapter (`src/lib/db.ts`: SQLite or Postgres) and scoped to an anonymous `cc_owner` cookie (`src/lib/owner.ts`). Reading by ID is public so results can be shared; writes are owner-only and rate limited (`src/lib/rateLimit.ts`). See [security.md](security.md).
+
 ## Data flow of one event
 
 `generated → in_transit → (delayed) → received → queued → processed → alert_generated → delivered`, or `dropped` / `rejected_duplicate` / `failed`. Every transition is stored on the event (`transitions`) and in the global log with the component and an explanation.
