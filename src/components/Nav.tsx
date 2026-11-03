@@ -4,10 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/", label: "Dashboard" },
+  { href: "/lab", label: "Lab" },
   { href: "/scenarios", label: "Scenarios" },
   { href: "/history", label: "History" },
-  { href: "/settings", label: "About" },
 ];
 
 export function Nav() {
@@ -20,8 +19,8 @@ export function Nav() {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-            <rect x="1" y="1" width="22" height="22" rx="6" fill="#12161c" stroke="#2dd4bf" />
-            <path d="M3 13h4l2-6 3 11 2-8 1.5 3H21" fill="none" stroke="#2dd4bf" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="1" y="1" width="22" height="22" rx="6" fill="#ffffff" stroke="#0b6b63" />
+            <path d="M3 13h4l2-6 3 11 2-8 1.5 3H21" fill="none" stroke="#0b6b63" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <span>
             Care<span className="text-teal">Chaos</span>
@@ -29,7 +28,7 @@ export function Nav() {
         </Link>
         <nav aria-label="Primary" className="flex flex-1 items-center gap-1">
           {links.map((l) => {
-            const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
+            const active = path.startsWith(l.href);
             return (
               <Link
                 key={l.href}

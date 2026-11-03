@@ -37,7 +37,7 @@ export function EventTrace({ event, onClose }: { event: EventRecord; onClose?: (
   );
 }
 
-export function EventStream({ result, limit = 60 }: { result: SimulationResult; limit?: number }) {
+export function EventStream({ result, limit = 60, bare = false }: { result: SimulationResult; limit?: number; bare?: boolean }) {
   const [component, setComponent] = useState("all");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -53,8 +53,16 @@ export function EventStream({ result, limit = 60 }: { result: SimulationResult; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result.log.length, result, component, q, limit]);
   const openEvent = open ? result.events.find((e) => e.eventId === open) : null;
+  const Wrap = bare
+    ? ({ action, children }: { title?: string; action?: React.ReactNode; children: React.ReactNode }) => (
+        <div>
+          <div className="mb-3 flex justify-end">{action}</div>
+          {children}
+        </div>
+      )
+    : Card;
   return (
-    <Card
+    <Wrap
       title={`Event stream (latest ${limit})`}
       action={
         <div className="flex flex-wrap gap-2">
@@ -108,6 +116,6 @@ export function EventStream({ result, limit = 60 }: { result: SimulationResult; 
           </table>
         </div>
       )}
-    </Card>
+    </Wrap>
   );
 }

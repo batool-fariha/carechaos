@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const pages = ["/", "/scenarios", "/history", "/settings", "/experiments/new"];
+const pages = ["/", "/lab", "/scenarios", "/history", "/settings", "/experiments/new"];
 
 for (const url of pages) {
   test(`no serious or critical accessibility violations on ${url}`, async ({ page }) => {
@@ -14,7 +14,7 @@ for (const url of pages) {
 }
 
 test("no serious accessibility violations on a finished run and results page", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   await page.getByTestId("run-demo").click();
   await page.getByTestId("ctl-skip").click();
   await page.getByTestId("view-results").waitFor();

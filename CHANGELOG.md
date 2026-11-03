@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Light theme, landing page at `/` with a pipeline diagram, lab moved to `/lab`.
+- Plain-language narrator banner; secondary numbers, charts, injector and event log are collapsed by default.
 - Headless scenario runner (`npm run scenarios`) with CI exit codes and report output; GitHub Actions workflow.
 - Experiment form supports up to four simultaneous faults; assertions are generated per fault type.
 - Storage adapter: Postgres via `DATABASE_URL`, SQLite otherwise; Settings shows which is active and whether it persists.

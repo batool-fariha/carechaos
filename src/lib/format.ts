@@ -5,10 +5,10 @@ export const fmtPct = (n: number | null | undefined) => (n === null || n === und
 export const clock = (n: number) => `${n.toFixed(1).padStart(6, " ")}s`;
 
 export const HEALTH_META: Record<Health, { label: string; glyph: string; text: string; bg: string; border: string; hex: string }> = {
-  healthy: { label: "Healthy", glyph: "✓", text: "text-teal", bg: "bg-teal/10", border: "border-teal/40", hex: "#2dd4bf" },
-  degraded: { label: "Degraded", glyph: "▲", text: "text-amber", bg: "bg-amber/10", border: "border-amber/40", hex: "#f5b13d" },
-  unavailable: { label: "Unavailable", glyph: "✕", text: "text-red", bg: "bg-red/10", border: "border-red/40", hex: "#f4616a" },
-  recovering: { label: "Recovering", glyph: "↻", text: "text-amber", bg: "bg-amber/10", border: "border-amber/40", hex: "#f5b13d" },
+  healthy: { label: "Healthy", glyph: "✓", text: "text-teal", bg: "bg-teal/10", border: "border-teal/40", hex: "#0b6b63" },
+  degraded: { label: "Degraded", glyph: "▲", text: "text-amber", bg: "bg-amber/10", border: "border-amber/40", hex: "#b45309" },
+  unavailable: { label: "Unavailable", glyph: "✕", text: "text-red", bg: "bg-red/10", border: "border-red/40", hex: "#b91c1c" },
+  recovering: { label: "Recovering", glyph: "↻", text: "text-amber", bg: "bg-amber/10", border: "border-amber/40", hex: "#b45309" },
 };
 
 export const SERVICE_SHORT: Record<ServiceId, string> = {

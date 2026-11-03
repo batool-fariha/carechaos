@@ -7,7 +7,8 @@ CareChaos lets you deliberately break a *synthetic* patient-monitoring data pipe
 > ⚠️ Simulation only. All patients, devices and readings are fictional. A passing experiment does **not** establish clinical safety or regulatory compliance. See [docs/safety.md](docs/safety.md).
 
 <!-- Screenshots: add docs/img/dashboard.png and docs/img/results.png -->
-![Dashboard mid-run: the Delivery Service is unavailable and its queue is building](docs/img/dashboard.png)
+![Landing page](docs/img/landing.png)
+![Lab mid-run: the Delivery Service is down and the page says so in plain language](docs/img/dashboard.png)
 ![Results page with assertions, baseline comparison and recommendations](docs/img/results.png)
 
 Regenerate with `npm run screenshots` (against a running app).
@@ -53,7 +54,7 @@ Requirements: **Node.js ≥ 22.5** (uses built-in `node:sqlite`; developed on No
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3000 (landing page; the lab is at /lab)
 ```
 
 Production:
@@ -74,7 +75,7 @@ On Vercel without `DATABASE_URL`, history falls back to ephemeral `/tmp` SQLite 
 
 ## Try it
 
-1. Open `/` and press **Run demo** (alert-service outage, resilient mode). Watch the Delivery node go *unavailable*, the queue build, then *recovering → healthy*.
+1. Open `/` and press **Run the demo** (or go to `/lab`) (alert-service outage, resilient mode). Watch the Delivery node go *unavailable*, the queue build, then *recovering → healthy*.
 2. Open the *Faulty reference* mode toggle and run again to see the same fault lose alerts.
 3. **Inject a failure** into a running experiment, or **Recover** a down service manually.
 4. When it finishes, **View results**: assertions, baseline vs run vs other mode, timeline, recoveries, failure modes, recommendations, event tracing. Export **JSON** or **Markdown**.
