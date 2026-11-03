@@ -2,6 +2,7 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "./Logo";
 
 const links = [
   { href: "/lab", label: "Lab" },
@@ -18,10 +19,7 @@ export function Nav() {
       </a>
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-            <rect x="1" y="1" width="22" height="22" rx="6" fill="#ffffff" stroke="#0b6b63" />
-            <path d="M3 13h4l2-6 3 11 2-8 1.5 3H21" fill="none" stroke="#0b6b63" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Logo size={26} />
           <span>
             Care<span className="text-teal">Chaos</span>
           </span>
@@ -41,7 +39,7 @@ export function Nav() {
             );
           })}
         </nav>
-        <a href="https://github.com/carechaos/carechaos" target="_blank" rel="noreferrer" className="text-sm text-mute hover:text-ink">
+        <a href="https://github.com/batool-fariha/carechaos" target="_blank" rel="noreferrer" className="text-sm text-mute hover:text-ink">
           GitHub ↗
         </a>
       </div>
