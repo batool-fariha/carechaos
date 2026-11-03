@@ -33,6 +33,17 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
   const { result: r, metrics: m } = ev;
   const [filter, setFilter] = useState("all");
   const [trace, setTrace] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  async function copyLink() {
+    const url = `${window.location.origin}/experiments/${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy this link", url);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   const traced = trace ? r.events.find((e) => e.eventId === trace) : null;
   const filtered = useMemo(() => r.events.filter(FILTERS[filter].test), [r, filter]);
   const stopped = r.status === "stopped";
@@ -59,6 +70,7 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button data-testid="copy-link" onClick={copyLink}>{copied ? "✓ Link copied" : "Copy share link"}</Button>
           <Button data-testid="export-json" onClick={() => download(`carechaos-${id}.json`, JSON.stringify(report(), null, 2), "application/json")}>Export JSON</Button>
           <Button data-testid="export-md" onClick={() => download(`carechaos-${id}.md`, reportToMarkdown(report()), "text/markdown")}>Export Markdown</Button>
           <Button variant="primary" onClick={onRunLive} data-testid="run-live">▶ Replay live</Button>

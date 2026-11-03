@@ -20,24 +20,25 @@ export interface Raw {
   verdict: string | null;
   summary_json: string | null;
   config_json: string;
+  owner: string | null;
 }
 
 interface Store {
   kind: "postgres" | "sqlite";
   location: string;
   persistent: boolean;
-  list(): Promise<Raw[]>;
+  list(owner: string): Promise<Raw[]>;
   get(id: string): Promise<Raw | undefined>;
   put(r: Raw): Promise<void>;
   remove(id: string): Promise<void>;
-  clear(): Promise<number>;
+  clear(owner: string): Promise<number>;
 }
 
-const COLUMNS = ["id", "created_at", "updated_at", "name", "scenario_id", "mode", "seed", "status", "verdict", "summary_json", "config_json"] as const;
+const COLUMNS = ["id", "created_at", "updated_at", "name", "scenario_id", "mode", "seed", "status", "verdict", "summary_json", "config_json", "owner"] as const;
 const TABLE_SQL = `CREATE TABLE IF NOT EXISTS experiments (
   id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, name TEXT NOT NULL,
   scenario_id TEXT NOT NULL, mode TEXT NOT NULL, seed BIGINT NOT NULL, status TEXT NOT NULL,
-  verdict TEXT, summary_json TEXT, config_json TEXT NOT NULL)`;
+  verdict TEXT, summary_json TEXT, config_json TEXT NOT NULL, owner TEXT)`;
 const UPSERT_SQL = (ph: (i: number) => string) =>
   `INSERT INTO experiments (${COLUMNS.join(",")}) VALUES (${COLUMNS.map((_, i) => ph(i + 1)).join(",")})
    ON CONFLICT (id) DO UPDATE SET ${COLUMNS.filter((c) => c !== "id" && c !== "created_at").map((c) => `${c}=excluded.${c}`).join(",")}`;
@@ -58,6 +59,7 @@ async function createStore(): Promise<Store> {
     const { default: postgres } = await import("postgres");
     const sql = postgres(url, { ssl: url.includes("localhost") ? false : "require", max: 1, idle_timeout: 20, onnotice: () => {} });
     await sql.unsafe(TABLE_SQL);
+    await sql.unsafe("ALTER TABLE experiments ADD COLUMN IF NOT EXISTS owner TEXT");
     const host = (() => {
       try {
         return new URL(url).host;
@@ -69,26 +71,28 @@ async function createStore(): Promise<Store> {
       kind: "postgres",
       location: host,
       persistent: true,
-      list: async () => (await sql.unsafe("SELECT * FROM experiments ORDER BY created_at DESC LIMIT 500")) as unknown as Raw[],
+      list: async (owner) => (await sql.unsafe("SELECT * FROM experiments WHERE owner = $1 ORDER BY created_at DESC LIMIT 500", [owner])) as unknown as Raw[],
       get: async (id) => ((await sql.unsafe("SELECT * FROM experiments WHERE id = $1", [id])) as unknown as Raw[])[0],
       put: async (r) => void (await sql.unsafe(UPSERT_SQL((i) => `$${i}`), COLUMNS.map((c) => r[c]) as never[])),
       remove: async (id) => void (await sql.unsafe("DELETE FROM experiments WHERE id = $1", [id])),
-      clear: async () => (await sql.unsafe("DELETE FROM experiments")).count,
+      clear: async (owner) => (await sql.unsafe("DELETE FROM experiments WHERE owner = $1", [owner])).count,
     };
   }
   const file = dbPath();
   mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(TABLE_SQL.replace("BIGINT", "INTEGER"));
+  const cols = db.prepare("PRAGMA table_info(experiments)").all() as unknown as { name: string }[];
+  if (!cols.some((c) => c.name === "owner")) db.exec("ALTER TABLE experiments ADD COLUMN owner TEXT");
   return {
     kind: "sqlite",
     location: file,
     persistent: !process.env.VERCEL || !!process.env.CARECHAOS_DB_PATH,
-    list: async () => db.prepare("SELECT * FROM experiments ORDER BY created_at DESC, rowid DESC LIMIT 500").all() as unknown as Raw[],
+    list: async (owner) => db.prepare("SELECT * FROM experiments WHERE owner = ? ORDER BY created_at DESC, rowid DESC LIMIT 500").all(owner) as unknown as Raw[],
     get: async (id) => db.prepare("SELECT * FROM experiments WHERE id = ?").get(id) as unknown as Raw | undefined,
     put: async (r) => void db.prepare(UPSERT_SQL(() => "?")).run(...COLUMNS.map((c) => r[c] as string | number | null)),
     remove: async (id) => void db.prepare("DELETE FROM experiments WHERE id = ?").run(id),
-    clear: async () => Number(db.prepare("DELETE FROM experiments").run().changes),
+    clear: async (owner) => Number(db.prepare("DELETE FROM experiments WHERE owner = ?").run(owner).changes),
   };
 }
 
@@ -125,6 +129,14 @@ export interface ExperimentRow {
   verdict: string | null;
   summary: Summary | null;
   config: ExperimentConfig;
+  /** Opaque per-browser owner ID. Never sent to clients; see publicRow(). */
+  owner: string | null;
+}
+
+/** Row as exposed over the API: everything except the owner ID. */
+export function publicRow(r: ExperimentRow): Omit<ExperimentRow, "owner"> {
+  const { owner: _owner, ...rest } = r;
+  return rest;
 }
 
 function summarize(ev: Evaluation): Summary {
@@ -156,10 +168,11 @@ const toRow = (r: Raw): ExperimentRow => ({
   verdict: r.verdict,
   summary: r.summary_json ? (JSON.parse(r.summary_json) as Summary) : null,
   config: JSON.parse(r.config_json) as ExperimentConfig,
+  owner: r.owner ?? null,
 });
 
-export async function listExperiments(): Promise<ExperimentRow[]> {
-  return (await (await getStore()).list()).map(toRow);
+export async function listExperiments(owner: string): Promise<ExperimentRow[]> {
+  return (await (await getStore()).list(owner)).map(toRow);
 }
 
 export async function getExperiment(id: string): Promise<ExperimentRow | null> {
@@ -168,7 +181,7 @@ export async function getExperiment(id: string): Promise<ExperimentRow | null> {
 }
 
 /** Summary and verdict are always recomputed server-side by replaying the engine; clients are not trusted. */
-export async function saveExperiment(config: ExperimentConfig, status: StoredStatus, id?: string): Promise<ExperimentRow> {
+export async function saveExperiment(config: ExperimentConfig, status: StoredStatus, owner: string, id?: string): Promise<ExperimentRow> {
   const now = new Date().toISOString();
   let verdict: string | null = null;
   let summary: string | null = null;
@@ -191,14 +204,19 @@ export async function saveExperiment(config: ExperimentConfig, status: StoredSta
     verdict,
     summary_json: summary,
     config_json: JSON.stringify(config),
+    owner: existing?.owner ?? owner,
   });
   return (await getExperiment(newId))!;
 }
 
-export async function deleteExperiment(id: string): Promise<void> {
+/** Deletes only if `owner` owns the experiment. Returns whether anything was deleted. */
+export async function deleteExperiment(id: string, owner: string): Promise<boolean> {
+  const row = await getExperiment(id);
+  if (!row || row.owner !== owner) return false;
   await (await getStore()).remove(id);
+  return true;
 }
 
-export async function clearExperiments(): Promise<number> {
-  return (await getStore()).clear();
+export async function clearExperiments(owner: string): Promise<number> {
+  return (await getStore()).clear(owner);
 }
