@@ -9,7 +9,7 @@ const body = z.object({ config: z.unknown(), status: z.enum(["created", "complet
 
 export async function GET() {
   try {
-    return NextResponse.json({ experiments: listExperiments() });
+    return NextResponse.json({ experiments: await listExperiments() });
   } catch (e) {
     return fail(e);
   }
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const v = validateConfig(parsed.data.config);
   if (!v.ok) return NextResponse.json({ error: "Invalid experiment configuration.", issues: v.issues }, { status: 422 });
   try {
-    const row = saveExperiment(v.config, parsed.data.status);
+    const row = await saveExperiment(v.config, parsed.data.status);
     return NextResponse.json({ id: row.id, experiment: row }, { status: 201 });
   } catch (e) {
     return fail(e);
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 /** Deletes all stored experiments (Settings page). */
 export async function DELETE() {
   try {
-    return NextResponse.json({ deleted: clearExperiments() });
+    return NextResponse.json({ deleted: await clearExperiments() });
   } catch (e) {
     return fail(e);
   }

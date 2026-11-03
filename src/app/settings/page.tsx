@@ -1,11 +1,17 @@
 import { APP_VERSION, ENGINE_VERSION, REPORT_LIMITATIONS, REPORT_SCHEMA_VERSION } from "@/engine";
 import { ClearHistory } from "@/components/ClearHistory";
 import { Card } from "@/components/ui";
-import { dbPath } from "@/lib/db";
+import { storageInfo } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export default function Settings() {
+export default async function Settings() {
+  let storage: Awaited<ReturnType<typeof storageInfo>> | null = null;
+  try {
+    storage = await storageInfo();
+  } catch {
+    storage = null;
+  }
   return (
     <div className="max-w-3xl space-y-5">
       <h1 className="text-3xl font-semibold tracking-tight">About &amp; settings</h1>
@@ -27,7 +33,7 @@ export default function Settings() {
           <dt className="text-mute">App version</dt><dd>{APP_VERSION}</dd>
           <dt className="text-mute">Engine version</dt><dd>{ENGINE_VERSION}</dd>
           <dt className="text-mute">Report schema</dt><dd>{REPORT_SCHEMA_VERSION}</dd>
-          <dt className="text-mute">History database</dt><dd className="break-all font-mono text-xs">{dbPath()}</dd>
+          <dt className="text-mute">History storage</dt><dd className="break-all text-xs">{storage ? <><b>{storage.kind}</b> · <span className="font-mono">{storage.location}</span> · {storage.persistent ? "persistent" : "ephemeral (resets on restart)"}</> : "unavailable"}</dd>
         </dl>
         <div className="mt-4"><ClearHistory /></div>
       </Card>

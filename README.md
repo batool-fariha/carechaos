@@ -7,8 +7,10 @@ CareChaos lets you deliberately break a *synthetic* patient-monitoring data pipe
 > ⚠️ Simulation only. All patients, devices and readings are fictional. A passing experiment does **not** establish clinical safety or regulatory compliance. See [docs/safety.md](docs/safety.md).
 
 <!-- Screenshots: add docs/img/dashboard.png and docs/img/results.png -->
-![Dashboard screenshot placeholder](docs/img/dashboard.png)
-![Results screenshot placeholder](docs/img/results.png)
+![Dashboard mid-run: the Delivery Service is unavailable and its queue is building](docs/img/dashboard.png)
+![Results page with assertions, baseline comparison and recommendations](docs/img/results.png)
+
+Regenerate with `npm run screenshots` (against a running app).
 
 ## The problem
 
@@ -61,7 +63,14 @@ npm run build
 npm start
 ```
 
-Environment (optional): `CARECHAOS_DB_PATH` — SQLite file for experiment history (default `data/carechaos.db`).
+Environment (all optional):
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` (or `POSTGRES_URL`) | Use Postgres for experiment history (e.g. Neon, Vercel Postgres). Table is created automatically. |
+| `CARECHAOS_DB_PATH` | SQLite file for history when no Postgres URL is set (default `data/carechaos.db`). |
+
+On Vercel without `DATABASE_URL`, history falls back to ephemeral `/tmp` SQLite and the Settings page says so.
 
 ## Try it
 
@@ -72,14 +81,25 @@ Environment (optional): `CARECHAOS_DB_PATH` — SQLite file for experiment histo
 
 ### Creating an experiment
 
-`/experiments/new` → choose a preset, set seed, event volume, reading interval, window, resilience mode and one fault (type, target, start, duration, intensity/delay). Validation tells you what to fix (for example when the outage would end after the window).
+`/experiments/new` → choose a preset, set seed, event volume, reading interval, window, resilience mode and up to four faults (type, target, start, duration, intensity/delay) that run simultaneously. Validation tells you what to fix (for example when the outage would end after the window).
+
+## Headless scenario runner (CI)
+
+```bash
+npm run scenarios                              # all scenarios, resilient mode
+npm run scenarios -- --mode both --out reports  # also run the faulty reference, write JSON + Markdown reports
+npm run scenarios -- --scenario packet-loss,out-of-order --seed 7
+```
+
+Exit code is 1 if any **resilient** scenario fails an assertion (faulty runs are reference runs and never fail the suite), 2 for bad arguments. `.github/workflows/ci.yml` runs typecheck, unit tests, the scenario suite and the Playwright tests.
 
 ## Tests
 
 ```bash
 npm run typecheck
 npm test              # Vitest: unit + integration (engine, metrics, assertions, reports)
-npm run test:e2e      # Playwright: builds the app and drives the real UI (npx playwright install chromium first)
+npm run test:e2e      # Playwright: builds the app, drives the real UI, runs axe accessibility checks (npx playwright install chromium first)
+TEST_DATABASE_URL=postgres://… npm test   # also exercises the Postgres storage adapter
 ```
 
 ## Project layout
@@ -96,7 +116,7 @@ docs/             architecture, experiments, metrics, safety, report schema, sam
 ## Limitations
 
 * Simplified pipeline model; latencies are virtual-time model outputs, not performance benchmarks.
-* One fault per experiment in the form (the engine supports several; live injection can add more).
+* At most four faults per experiment. Events with an injected duplicate copy are excluded from latency assertions, because a copy bypasses the link fault.
 * Alert thresholds are illustrative, not validated.
 * Reading volume is capped at 2000 per experiment; the browser runs the engine, so very long runs at high speed use more CPU.
 * History stores configs and replays them; it does not archive raw event logs. If you change engine logic, old experiments will replay with the new logic (`engineVersion` is recorded in reports).
@@ -104,12 +124,11 @@ docs/             architecture, experiments, metrics, safety, report schema, sam
 
 ## Roadmap
 
-* Multiple simultaneous faults in the form, fault schedules, and chaos "game days".
+* Fault schedules and chaos "game days".
 * Network partition and clock-skew faults; rate limiting and backpressure.
 * Archive raw logs for exact historical results across engine versions.
 * Pluggable pipeline definitions and user-supplied processing code.
-* CI mode: run scenario suites from the CLI and fail builds on assertion failures.
-* Dark/light theme toggle and richer accessibility audits.
+* Light theme and screen-reader testing beyond automated axe checks.
 
 ## Contributing
 

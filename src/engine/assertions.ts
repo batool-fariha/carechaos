@@ -227,7 +227,8 @@ const checks: Record<AssertionKind, (c: Ctx) => Verdict> = {
     if (!faults.length) return na();
     const f = faults[0];
     const tag = `latency@${f.target}`;
-    const affected = r.events.filter((e) => e.faultTags.includes(tag) && e.processedAt !== null);
+    // Events with injected duplicate copies are excluded: a copy bypasses the link fault and can be processed first.
+    const affected = r.events.filter((e) => e.faultTags.includes(tag) && e.processedAt !== null && e.duplicateCopies === 0);
     if (!affected.length) return na();
     const lat = affected.map((e) => (e.processedAt as number) - e.eventTime);
     const min = Math.min(...lat);
@@ -237,7 +238,7 @@ const checks: Record<AssertionKind, (c: Ctx) => Verdict> = {
     const faults = faultsOf(r, "latency").filter((f) => f.delaySec > r.config.staleThresholdSec);
     if (!faults.length) return na();
     const f = faults[0];
-    const affected = r.events.filter((e) => e.faultTags.includes(`latency@${f.target}`));
+    const affected = r.events.filter((e) => e.faultTags.includes(`latency@${f.target}`) && e.duplicateCopies === 0);
     const flagged = affected.filter((e) => e.staleFlagged);
     return verdict(affected.length > 0 && flagged.length === affected.length, `delayed data older than ${r.config.staleThresholdSec}s is flagged stale`, `${flagged.length}/${affected.length} delayed events flagged stale`, affected.filter((e) => !e.staleFlagged).map((e) => e.eventId));
   },

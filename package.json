@@ -14,11 +14,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "sample-report": "tsx scripts/sample-report.ts"
+    "sample-report": "tsx scripts/sample-report.ts",
+    "scenarios": "tsx scripts/run-scenarios.ts",
+    "screenshots": "tsx scripts/screenshots.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "next": "^16.4.4",
+    "postgres": "^4.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "recharts": "^3.10.1",
@@ -26,6 +29,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.4",
     "@types/node": "^26.6.6",

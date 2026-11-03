@@ -7,3 +7,4 @@ export * from "./scenarios";
 export * from "./run";
 export * from "./insights";
 export * from "./report";
+export * from "./suite";
