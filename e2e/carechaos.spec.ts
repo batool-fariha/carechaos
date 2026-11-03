@@ -133,3 +133,25 @@ test("scenario library lists all scenarios and navigation works", async ({ page 
   await page.getByRole("link", { name: "About" }).click();
   await expect(page.getByText("not a clinical decision-support system", { exact: false })).toBeVisible();
 });
+
+test("combine multiple faults in one experiment", async ({ page }) => {
+  await page.goto("/experiments/new?scenario=duplicate-events");
+  await expect(page.getByTestId("fault-0")).toBeVisible();
+  await page.getByTestId("add-fault").click();
+  await expect(page.getByTestId("fault-1")).toBeVisible();
+  await page.locator("#fault-1-type").selectOption("outage");
+  await page.locator("#fault-1-target").selectOption("delivery");
+  await page.locator("#fault-1-start").fill("50");
+  await page.locator("#fault-1-duration").fill("30");
+  await page.locator("#name").fill("E2E combined faults");
+  await page.getByTestId("create-experiment").click();
+  await page.waitForURL(/\/experiments\/exp_/);
+  await page.getByTestId("run-demo").click();
+  await page.getByTestId("ctl-skip").click();
+  await page.getByTestId("view-results").click();
+  const results = page.getByTestId("results");
+  await expect(results).toContainText("Duplicate delivery fault");
+  await expect(results).toContainText("Outage fault");
+  await expect(page.getByTestId("assertion-list")).toContainText("All injected duplicates are rejected");
+  await expect(page.getByTestId("assertion-list")).toContainText("The service does no work while unavailable");
+});

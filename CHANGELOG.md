@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Headless scenario runner (`npm run scenarios`) with CI exit codes and report output; GitHub Actions workflow.
+- Experiment form supports up to four simultaneous faults; assertions are generated per fault type.
+- Storage adapter: Postgres via `DATABASE_URL`, SQLite otherwise; Settings shows which is active and whether it persists.
+- Automated axe accessibility checks; real README screenshots (`npm run screenshots`).
+
 ## 0.1.0 — MVP
 
 - Deterministic, event-driven simulation engine with a virtual clock and seeded PRNG.

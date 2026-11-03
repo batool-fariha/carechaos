@@ -8,24 +8,24 @@ import { Button, Card, Field, inputClass } from "./ui";
 export function ExperimentForm({ initialScenario }: { initialScenario: string }) {
   const router = useRouter();
   const [cfg, setCfg] = useState<ExperimentConfig>(() => scenarioConfig(getScenario(initialScenario) ? initialScenario : "alert-service-outage"));
-  const [useFault, setUseFault] = useState(cfg.faults.length > 0);
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const fault: FaultConfig = cfg.faults[0] ?? makeFault({ type: "outage", target: "delivery" });
-  const effective: ExperimentConfig = { ...cfg, faults: useFault ? [fault] : [] };
-  const validation = useMemo(() => validateConfig(effective), [effective]);
+  const validation = useMemo(() => validateConfig(cfg), [cfg]);
   const issues = validation.ok ? [] : validation.issues;
   const err = (path: string) => issues.find((i) => i.path === path || i.path.endsWith(`.${path}`))?.message;
-  const faultErrors: Record<string, string> = {};
-  issues.filter((i) => i.path.startsWith("faults.")).forEach((i) => (faultErrors[i.path.split(".").pop() as string] = i.message));
+  const faultErrors = (idx: number) => {
+    const out: Record<string, string> = {};
+    issues.filter((i) => i.path.startsWith(`faults.${idx}.`)).forEach((i) => (out[i.path.split(".").pop() as string] = i.message));
+    return out;
+  };
+  const setFault = (idx: number, f: FaultConfig) => set({ faults: cfg.faults.map((x, i) => (i === idx ? f : x)) });
   const set = (p: Partial<ExperimentConfig>) => setCfg({ ...cfg, ...p });
   const num = (v: string) => (v === "" ? NaN : Number(v));
 
   function applyPreset(id: string) {
     const next = scenarioConfig(id, { seed: cfg.seed, mode: cfg.mode });
     setCfg(next);
-    setUseFault(next.faults.length > 0);
   }
 
   async function submit(e: React.FormEvent) {
@@ -95,11 +95,28 @@ export function ExperimentForm({ initialScenario }: { initialScenario: string })
         </div>
       </Card>
 
-      <Card title="3 · Fault">
-        <label className="mb-4 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={useFault} onChange={(e) => setUseFault(e.target.checked)} data-testid="use-fault" /> Inject a fault (uncheck for a healthy baseline run)
-        </label>
-        {useFault && <FaultFields fault={fault} errors={faultErrors} onChange={(f) => set({ faults: [f] })} />}
+      <Card
+        title={`3 · Faults (${cfg.faults.length}/4)`}
+        action={
+          <Button type="button" disabled={cfg.faults.length >= 4} onClick={() => set({ faults: [...cfg.faults, makeFault({ type: "latency", target: "processor", startSec: 20, durationSec: 40, delaySec: 15, intensity: 1 })] })} data-testid="add-fault">
+            + Add fault
+          </Button>
+        }
+      >
+        {cfg.faults.length === 0 && <p className="text-sm text-mute">No faults: this will be a healthy baseline run. Add one or more faults to combine failure modes.</p>}
+        <div className="space-y-5">
+          {cfg.faults.map((f, i) => (
+            <div key={i} className="rounded-md border border-line bg-bg/40 p-4" data-testid={`fault-${i}`}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Fault {i + 1}</h3>
+                <Button type="button" variant="ghost" onClick={() => set({ faults: cfg.faults.filter((_, k) => k !== i) })} aria-label={`Remove fault ${i + 1}`}>
+                  Remove
+                </Button>
+              </div>
+              <FaultFields idPrefix={`fault-${i}`} fault={f} errors={faultErrors(i)} onChange={(nf) => setFault(i, nf)} />
+            </div>
+          ))}
+        </div>
       </Card>
 
       {issues.length > 0 && (

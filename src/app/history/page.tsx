@@ -5,11 +5,11 @@ import { listExperiments, type ExperimentRow } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export default function History() {
+export default async function History() {
   let rows: ExperimentRow[] = [];
   let error: string | null = null;
   try {
-    rows = listExperiments();
+    rows = await listExperiments();
   } catch (e) {
     console.error(JSON.stringify({ level: "error", msg: "history load failed", error: String(e) }));
     error = "Experiment storage is unavailable, so history can't be shown. The simulator itself still works.";

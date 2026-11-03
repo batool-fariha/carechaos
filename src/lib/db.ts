@@ -4,8 +4,43 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { runExperiment, type Evaluation, type ExperimentConfig } from "@/engine";
 
-/** Optional local persistence using Node's built-in SQLite (no native dependency). */
-let db: DatabaseSync | null = null;
+/**
+ * Experiment storage. Uses Postgres when DATABASE_URL (or POSTGRES_URL) is set, otherwise local SQLite
+ * (Node's built-in node:sqlite). On Vercel without a database it falls back to ephemeral /tmp SQLite.
+ */
+export interface Raw {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  scenario_id: string;
+  mode: string;
+  seed: number;
+  status: StoredStatus;
+  verdict: string | null;
+  summary_json: string | null;
+  config_json: string;
+}
+
+interface Store {
+  kind: "postgres" | "sqlite";
+  location: string;
+  persistent: boolean;
+  list(): Promise<Raw[]>;
+  get(id: string): Promise<Raw | undefined>;
+  put(r: Raw): Promise<void>;
+  remove(id: string): Promise<void>;
+  clear(): Promise<number>;
+}
+
+const COLUMNS = ["id", "created_at", "updated_at", "name", "scenario_id", "mode", "seed", "status", "verdict", "summary_json", "config_json"] as const;
+const TABLE_SQL = `CREATE TABLE IF NOT EXISTS experiments (
+  id TEXT PRIMARY KEY, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, name TEXT NOT NULL,
+  scenario_id TEXT NOT NULL, mode TEXT NOT NULL, seed BIGINT NOT NULL, status TEXT NOT NULL,
+  verdict TEXT, summary_json TEXT, config_json TEXT NOT NULL)`;
+const UPSERT_SQL = (ph: (i: number) => string) =>
+  `INSERT INTO experiments (${COLUMNS.join(",")}) VALUES (${COLUMNS.map((_, i) => ph(i + 1)).join(",")})
+   ON CONFLICT (id) DO UPDATE SET ${COLUMNS.filter((c) => c !== "id" && c !== "created_at").map((c) => `${c}=excluded.${c}`).join(",")}`;
 
 export function dbPath(): string {
   if (process.env.CARECHAOS_DB_PATH) return process.env.CARECHAOS_DB_PATH;
@@ -14,25 +49,52 @@ export function dbPath(): string {
   return path.join(process.cwd(), "data", "carechaos.db");
 }
 
-function getDb(): DatabaseSync {
-  if (db) return db;
+let store: Promise<Store> | null = null;
+const getStore = () => (store ??= createStore());
+
+async function createStore(): Promise<Store> {
+  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  if (url) {
+    const { default: postgres } = await import("postgres");
+    const sql = postgres(url, { ssl: url.includes("localhost") ? false : "require", max: 1, idle_timeout: 20, onnotice: () => {} });
+    await sql.unsafe(TABLE_SQL);
+    const host = (() => {
+      try {
+        return new URL(url).host;
+      } catch {
+        return "configured database";
+      }
+    })();
+    return {
+      kind: "postgres",
+      location: host,
+      persistent: true,
+      list: async () => (await sql.unsafe("SELECT * FROM experiments ORDER BY created_at DESC LIMIT 500")) as unknown as Raw[],
+      get: async (id) => ((await sql.unsafe("SELECT * FROM experiments WHERE id = $1", [id])) as unknown as Raw[])[0],
+      put: async (r) => void (await sql.unsafe(UPSERT_SQL((i) => `$${i}`), COLUMNS.map((c) => r[c]) as never[])),
+      remove: async (id) => void (await sql.unsafe("DELETE FROM experiments WHERE id = $1", [id])),
+      clear: async () => (await sql.unsafe("DELETE FROM experiments")).count,
+    };
+  }
   const file = dbPath();
   mkdirSync(path.dirname(file), { recursive: true });
-  db = new DatabaseSync(file);
-  db.exec(`CREATE TABLE IF NOT EXISTS experiments (
-    id TEXT PRIMARY KEY,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    name TEXT NOT NULL,
-    scenario_id TEXT NOT NULL,
-    mode TEXT NOT NULL,
-    seed INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    verdict TEXT,
-    summary_json TEXT,
-    config_json TEXT NOT NULL
-  )`);
-  return db;
+  const db = new DatabaseSync(file);
+  db.exec(TABLE_SQL.replace("BIGINT", "INTEGER"));
+  return {
+    kind: "sqlite",
+    location: file,
+    persistent: !process.env.VERCEL || !!process.env.CARECHAOS_DB_PATH,
+    list: async () => db.prepare("SELECT * FROM experiments ORDER BY created_at DESC, rowid DESC LIMIT 500").all() as unknown as Raw[],
+    get: async (id) => db.prepare("SELECT * FROM experiments WHERE id = ?").get(id) as unknown as Raw | undefined,
+    put: async (r) => void db.prepare(UPSERT_SQL(() => "?")).run(...COLUMNS.map((c) => r[c] as string | number | null)),
+    remove: async (id) => void db.prepare("DELETE FROM experiments WHERE id = ?").run(id),
+    clear: async () => Number(db.prepare("DELETE FROM experiments").run().changes),
+  };
+}
+
+export async function storageInfo(): Promise<{ kind: string; location: string; persistent: boolean }> {
+  const s = await getStore();
+  return { kind: s.kind, location: s.location, persistent: s.persistent };
 }
 
 export type StoredStatus = "created" | "completed" | "stopped";
@@ -82,20 +144,6 @@ function summarize(ev: Evaluation): Summary {
   };
 }
 
-interface Raw {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  name: string;
-  scenario_id: string;
-  mode: string;
-  seed: number;
-  status: StoredStatus;
-  verdict: string | null;
-  summary_json: string | null;
-  config_json: string;
-}
-
 const toRow = (r: Raw): ExperimentRow => ({
   id: r.id,
   createdAt: r.created_at,
@@ -110,17 +158,17 @@ const toRow = (r: Raw): ExperimentRow => ({
   config: JSON.parse(r.config_json) as ExperimentConfig,
 });
 
-export function listExperiments(): ExperimentRow[] {
-  return (getDb().prepare("SELECT * FROM experiments ORDER BY created_at DESC, rowid DESC LIMIT 500").all() as unknown as Raw[]).map(toRow);
+export async function listExperiments(): Promise<ExperimentRow[]> {
+  return (await (await getStore()).list()).map(toRow);
 }
 
-export function getExperiment(id: string): ExperimentRow | null {
-  const r = getDb().prepare("SELECT * FROM experiments WHERE id = ?").get(id) as unknown as Raw | undefined;
+export async function getExperiment(id: string): Promise<ExperimentRow | null> {
+  const r = await (await getStore()).get(id);
   return r ? toRow(r) : null;
 }
 
 /** Summary and verdict are always recomputed server-side by replaying the engine; clients are not trusted. */
-export function saveExperiment(config: ExperimentConfig, status: StoredStatus, id?: string): ExperimentRow {
+export async function saveExperiment(config: ExperimentConfig, status: StoredStatus, id?: string): Promise<ExperimentRow> {
   const now = new Date().toISOString();
   let verdict: string | null = null;
   let summary: string | null = null;
@@ -129,24 +177,28 @@ export function saveExperiment(config: ExperimentConfig, status: StoredStatus, i
     verdict = ev.verdict;
     summary = JSON.stringify(summarize(ev));
   }
-  const database = getDb();
-  if (id && getExperiment(id)) {
-    database
-      .prepare("UPDATE experiments SET updated_at=?, name=?, scenario_id=?, mode=?, seed=?, status=?, verdict=?, summary_json=?, config_json=? WHERE id=?")
-      .run(now, config.name, config.scenarioId, config.mode, config.seed, status, verdict, summary, JSON.stringify(config), id);
-    return getExperiment(id)!;
-  }
+  const existing = id ? await getExperiment(id) : null;
   const newId = id ?? `exp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  database
-    .prepare("INSERT INTO experiments (id, created_at, updated_at, name, scenario_id, mode, seed, status, verdict, summary_json, config_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-    .run(newId, now, now, config.name, config.scenarioId, config.mode, config.seed, status, verdict, summary, JSON.stringify(config));
-  return getExperiment(newId)!;
+  await (await getStore()).put({
+    id: newId,
+    created_at: existing?.createdAt ?? now,
+    updated_at: now,
+    name: config.name,
+    scenario_id: config.scenarioId,
+    mode: config.mode,
+    seed: config.seed,
+    status,
+    verdict,
+    summary_json: summary,
+    config_json: JSON.stringify(config),
+  });
+  return (await getExperiment(newId))!;
 }
 
-export function deleteExperiment(id: string): void {
-  getDb().prepare("DELETE FROM experiments WHERE id = ?").run(id);
+export async function deleteExperiment(id: string): Promise<void> {
+  await (await getStore()).remove(id);
 }
 
-export function clearExperiments(): number {
-  return Number(getDb().prepare("DELETE FROM experiments").run().changes);
+export async function clearExperiments(): Promise<number> {
+  return (await getStore()).clear();
 }
