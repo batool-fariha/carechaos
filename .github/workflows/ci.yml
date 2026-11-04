@@ -15,3 +15,14 @@ jobs:
         with: { name: scenario-reports, path: reports }
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+  action-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the CareChaos Action against the bundled example
+        uses: ./
+        with:
+          files: examples/carechaos.json examples/game-day.json
+          mode: both
+      - uses: actions/upload-artifact@v4
+        with: { name: carechaos-junit, path: carechaos-junit.xml }
