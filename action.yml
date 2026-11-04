@@ -1,5 +1,5 @@
 name: CareChaos
-description: Run chaos experiments against your own patient-monitoring pipeline profile (simulation only) and fail the build if an assertion breaks.
+description: Run chaos experiments on fictional patient-monitoring pipelines and report resilience failures.
 author: Fariha Batool
 branding:
   icon: activity
