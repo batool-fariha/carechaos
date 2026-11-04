@@ -1,0 +1,10 @@
+{
+  "experiments": [
+    { "scenario": "game-day", "name": "Game day on defaults" },
+    {
+      "scenario": "game-day",
+      "name": "Game day on a smaller pipeline",
+      "pipeline": { "capacities": { "processor": 8, "delivery": 4 }, "queueCapacity": 200 }
+    }
+  ]
+}

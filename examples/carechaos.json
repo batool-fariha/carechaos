@@ -1,0 +1,15 @@
+{
+  "name": "Alerts survive a delivery outage on my pipeline",
+  "scenario": "alert-service-outage",
+  "pipeline": {
+    "capacities": { "processor": 15, "delivery": 6 },
+    "retry": { "maxRetries": 8, "baseSec": 1, "capSec": 8 },
+    "alertRules": { "heart_rate": { "op": ">", "threshold": 130 } }
+  },
+  "assertions": [
+    { "kind": "no_work_during_outage", "title": "No alert is delivered while delivery is down" },
+    { "kind": "processed_after_recovery", "title": "Queued alerts are delivered after recovery" },
+    { "kind": "recovery_time_max", "title": "Recovery within 90 s", "params": { "maxSec": 90 } },
+    { "kind": "no_unexpected_loss", "title": "Nothing is lost" }
+  ]
+}

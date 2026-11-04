@@ -1,15 +1,37 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { SCENARIOS, getScenario, makeFault, scenarioConfig, validateConfig, type ExperimentConfig, type FaultConfig } from "@/engine";
+import { MAX_FAULTS, SCENARIOS, configToFile, parseSuiteFile, getScenario, makeFault, scenarioConfig, validateConfig, type ExperimentConfig, type FaultConfig } from "@/engine";
 import { FaultFields } from "./FaultInjector";
-import { Button, Card, Field, inputClass } from "./ui";
+import { FaultTimeline } from "./FaultTimeline";
+import { PipelineFields } from "./PipelineFields";
+import { download } from "@/lib/download";
+import { Button, Card, Disclosure, Field, inputClass } from "./ui";
 
 export function ExperimentForm({ initialScenario }: { initialScenario: string }) {
   const router = useRouter();
   const [cfg, setCfg] = useState<ExperimentConfig>(() => scenarioConfig(getScenario(initialScenario) ? initialScenario : "alert-service-outage"));
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function importFile(file: File | undefined) {
+    if (!file) return;
+    let json: unknown;
+    try {
+      json = JSON.parse(await file.text());
+    } catch {
+      setImportMsg({ ok: false, text: "That file is not valid JSON." });
+      return;
+    }
+    const r = parseSuiteFile(json);
+    if (!r.ok) {
+      setImportMsg({ ok: false, text: r.errors.slice(0, 4).join(" · ") });
+      return;
+    }
+    setCfg(r.experiments[0].config);
+    setImportMsg({ ok: true, text: `Loaded "${r.experiments[0].config.name}"${r.experiments.length > 1 ? ` (first of ${r.experiments.length} experiments in the file)` : ""}${r.experiments[0].assertions ? ". Custom assertions in the file apply only to the CLI." : "."}` });
+  }
 
   const validation = useMemo(() => validateConfig(cfg), [cfg]);
   const issues = validation.ok ? [] : validation.issues;
@@ -47,7 +69,25 @@ export function ExperimentForm({ initialScenario }: { initialScenario: string })
   const scenario = getScenario(cfg.scenarioId);
   return (
     <form onSubmit={submit} className="space-y-5" noValidate data-testid="experiment-form">
-      <Card title="1 · Scenario preset">
+      <Card
+        title="1 · Scenario preset"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <label className="inline-flex cursor-pointer items-center rounded-md border border-line bg-panel2 px-3 py-1.5 text-sm font-medium hover:border-mute/50 focus-within:outline focus-within:outline-2 focus-within:outline-teal">
+              Import file
+              <input type="file" accept="application/json,.json" className="sr-only" data-testid="import-file" onChange={(e) => importFile(e.target.files?.[0])} />
+            </label>
+            <Button type="button" onClick={() => download(`${cfg.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "carechaos"}.json`, JSON.stringify(configToFile(cfg), null, 2) + "\n", "application/json")} data-testid="export-config">
+              Download file
+            </Button>
+          </div>
+        }
+      >
+        {importMsg && (
+          <p role={importMsg.ok ? "status" : "alert"} className={`mb-3 text-sm ${importMsg.ok ? "text-teal" : "text-red"}`} data-testid="import-msg">
+            {importMsg.text}
+          </p>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Preset" htmlFor="scenario" hint={scenario?.description}>
             <select id="scenario" className={inputClass} value={cfg.scenarioId} onChange={(e) => applyPreset(e.target.value)}>
@@ -96,14 +136,20 @@ export function ExperimentForm({ initialScenario }: { initialScenario: string })
       </Card>
 
       <Card
-        title={`3 · Faults (${cfg.faults.length}/4)`}
+        title={`3 · Faults (${cfg.faults.length}/${MAX_FAULTS})`}
         action={
-          <Button type="button" disabled={cfg.faults.length >= 4} onClick={() => set({ faults: [...cfg.faults, makeFault({ type: "latency", target: "processor", startSec: 20, durationSec: 40, delaySec: 15, intensity: 1 })] })} data-testid="add-fault">
+          <Button type="button" disabled={cfg.faults.length >= MAX_FAULTS} onClick={() => set({ faults: [...cfg.faults, makeFault({ type: "latency", target: "processor", startSec: 20, durationSec: 40, delaySec: 15, intensity: 1 })] })} data-testid="add-fault">
             + Add fault
           </Button>
         }
       >
         {cfg.faults.length === 0 && <p className="text-sm text-mute">No faults: this will be a healthy baseline run. Add one or more faults to combine failure modes.</p>}
+        {cfg.faults.length > 0 && (
+          <div className="mb-5 rounded-md border border-line bg-bg/40 p-4">
+            <h3 className="mb-2 text-sm font-semibold">Schedule</h3>
+            <FaultTimeline faults={cfg.faults} durationSec={Number.isFinite(cfg.durationSec) && cfg.durationSec > 0 ? cfg.durationSec : 300} />
+          </div>
+        )}
         <div className="space-y-5">
           {cfg.faults.map((f, i) => (
             <div key={i} className="rounded-md border border-line bg-bg/40 p-4" data-testid={`fault-${i}`}>
@@ -118,6 +164,10 @@ export function ExperimentForm({ initialScenario }: { initialScenario: string })
           ))}
         </div>
       </Card>
+
+      <Disclosure title="4 · Your pipeline" hint="capacities, retries, queue limits, alert rules (optional)" testId="pipeline-disclosure" defaultOpen={!!cfg.pipeline}>
+        <PipelineFields value={cfg.pipeline} onChange={(pipeline) => setCfg((c) => { const { pipeline: _old, ...rest } = c; return pipeline ? { ...rest, pipeline } : rest; })} />
+      </Disclosure>
 
       {issues.length > 0 && (
         <div role="alert" className="rounded-lg border border-red/40 bg-red/10 p-4 text-sm text-red" data-testid="form-errors">

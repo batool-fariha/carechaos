@@ -19,7 +19,9 @@ Break a fictional patient-monitoring pipeline on purpose and see whether alerts 
 
 > ⚠️ **Simulation only.** All patients, devices and readings are fictional. CareChaos is a developer and educational tool, not a clinical decision-support system. A passing experiment does **not** establish clinical safety or regulatory compliance. See [docs/safety.md](docs/safety.md).
 
-![The lab mid-run: the Delivery Service is down and the page says so in plain language](docs/img/dashboard.png)
+![Demo: the same outage against the resilient system and the weak system](docs/media/demo.gif)
+
+*The same 60-second outage, run against the resilient system and then the weak one. [Full video](https://github.com/batool-fariha/carechaos/releases/latest) · [Read the write-up](docs/blog/what-happens-when-delivery-dies.md)*
 
 ## Contents
 
@@ -78,14 +80,16 @@ Details: [docs/architecture.md](docs/architecture.md).
 | Area | What you get |
 |---|---|
 | Faults | Latency (5 / 15 / 60 s presets), duplicate delivery, outage (manual or timed recovery), packet loss (5 / 10 / 25 %), out-of-order delivery, recovery backlog with configurable drain rate |
-| Scenarios | Seven ready-made experiments, each with hypothesis, initial conditions, expected behavior, assertions and relevant metrics |
+| Scenarios | Eight ready-made experiments, each with hypothesis, initial conditions, expected behavior, assertions and relevant metrics |
+| Your pipeline | Describe your own stages' capacities, queue limits, retry policy and alert rules (form, or a small JSON file) and run the same faults against it |
+| Game days | Schedule up to 12 faults on a timeline; ready-made "bad afternoon" scenario stacks five |
 | Lab | Plain-language narrator, guided four-step tracker, live pipeline view, live fault injection, manual recovery, pause / stop / reset / replay |
 | Results | Assertion verdicts with evidence, baseline vs run vs other-mode comparison, timeline, recovery table, failure modes, evidence-based recommendations, per-event tracing |
 | Reports | JSON ([schema 1.0](docs/report-schema.md)) and Markdown, generated from the completed run |
 | Sharing | Copy a link to any result; Open Graph preview card |
-| History | Per-browser history in SQLite locally or Postgres in production |
-| Automation | Headless scenario runner with CI exit codes |
-| Quality | 65 unit and integration tests, 21 Playwright end-to-end tests, automated accessibility checks (axe) |
+| History | Per-browser history (SQLite locally, Postgres in production); optional GitHub sign-in so it follows you across devices |
+| Automation | `carechaos` CLI and a GitHub Action: run experiment files in CI, JUnit output, step summaries, exit codes |
+| Quality | 89 unit and integration tests, 27 Playwright end-to-end tests (including the OAuth flow against a fake GitHub), automated accessibility checks (axe) |
 
 ## Quick start
 
@@ -106,7 +110,7 @@ npm run build && npm start   # production build
 
 ### Create your own experiment
 
-`/experiments/new` → choose a preset, then set seed, event volume, reading interval, window, resilience mode and up to four simultaneous faults (type, target service, start, duration, intensity or delay). The form explains each parameter and tells you what to fix if a combination is impossible, for example an outage that would end after the observation window.
+`/experiments/new` → choose a preset, then set seed, event volume, reading interval, window, resilience mode and up to twelve scheduled faults (type, target service, start, duration, intensity or delay), with a timeline preview. Open **Your pipeline** to set stage capacities, queue limits, retry policy and alert rules, or **Import file** to load a JSON file. The form explains each parameter and tells you what to fix if a combination is impossible, for example an outage that would end after the observation window.
 
 ## Configuration
 
@@ -116,7 +120,8 @@ All variables are optional.
 |---|---|
 | `DATABASE_URL` / `POSTGRES_URL` | Store history in Postgres (Neon, Vercel Postgres, any provider). The table is created automatically. |
 | `CARECHAOS_DB_PATH` | SQLite file used when no Postgres URL is set. Default `data/carechaos.db`. |
-| `NEXT_PUBLIC_SITE_URL` | Public site URL for link previews. Default `https://carechaos.vercel.app`. |
+| `NEXT_PUBLIC_SITE_URL` | Public site URL for link previews and OAuth redirects. Default `https://carechaos.vercel.app`. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET` | Enable "Sign in with GitHub" (all three required; `SESSION_SECRET` at least 32 characters). See [docs/deployment.md](docs/deployment.md#github-sign-in). |
 
 Without any database variable on Vercel, history falls back to an ephemeral `/tmp` SQLite file; **Settings** tells you which storage is active and whether it persists.
 
@@ -124,7 +129,26 @@ Without any database variable on Vercel, history falls back to an ephemeral `/tm
 
 One-click path: import the repo into [Vercel](https://vercel.com/new), add a Neon Postgres from the Vercel Marketplace (it sets `DATABASE_URL` for you), and deploy. Step-by-step: [docs/deployment.md](docs/deployment.md).
 
-## CLI and CI
+## Your own pipeline, in CI
+
+Describe your pipeline and faults in a JSON file ([format](docs/pipeline-file.md), [examples](examples/)) and run it anywhere:
+
+```bash
+npm run carechaos -- init                      # writes an example carechaos.json
+npm run carechaos -- run carechaos.json --junit results.xml
+```
+
+In GitHub Actions:
+
+```yaml
+- uses: batool-fariha/carechaos@main
+  with:
+    files: carechaos.json
+```
+
+The step summary lists each experiment and failed assertion; exit code `1` fails the build. Full reference: [docs/cli.md](docs/cli.md).
+
+## Built-in scenario runner
 
 ```bash
 npm run scenarios                               # all scenarios, resilient mode
@@ -161,27 +185,29 @@ docs/             architecture, experiments, metrics, report schema, API, securi
 |---|---|
 | [Architecture](docs/architecture.md) | Engine design, scheduler, determinism, how the app drives it |
 | [Experiments](docs/experiments.md) | Fault semantics, outage and recovery rules, the seven scenarios |
+| [CLI and GitHub Action](docs/cli.md) | Commands, flags, exit codes, JUnit, the Action |
+| [Experiment file format](docs/pipeline-file.md) | Describe your pipeline, faults and assertions in JSON |
 | [Metrics](docs/metrics.md) | Every metric, its denominator, and loss classification |
 | [Report schema](docs/report-schema.md) | Stable JSON report format, with a [sample](docs/sample-report.json) |
 | [API](docs/api.md) | HTTP endpoints |
 | [Security and privacy](docs/security.md) | Ownership model, rate limiting, what is stored |
 | [Deployment](docs/deployment.md) | Vercel and Neon, environment variables |
 | [Safety](docs/safety.md) | Scope and limits of what this tool can claim |
+| [Write-up](docs/blog/what-happens-when-delivery-dies.md) | One experiment, walked through with real numbers |
 
 ## Limitations
 
 * A simplified pipeline model. Latencies are virtual-time outputs, not performance benchmarks.
-* At most four faults per experiment. Events with an injected duplicate copy are excluded from latency assertions, because a copy bypasses the link fault.
+* At most twelve faults per experiment. The pipeline profile tunes the six existing stages; it does not (yet) add or reorder stages. Events with an injected duplicate copy are excluded from latency assertions, because a copy bypasses the link fault.
 * Alert thresholds are illustrative demo values, not validated clinical thresholds.
 * Reading volume is capped at 2000 per experiment. The browser runs the engine, so very long runs at high speed use more CPU.
 * History stores configurations and replays them rather than archiving raw event logs, so old experiments replay with the current engine logic (`engineVersion` is recorded in reports).
-* The rate limiter is best-effort (in-memory per serverless instance). History ownership is an anonymous browser cookie, not an account.
+* The rate limiter is best-effort (in-memory per serverless instance). Without GitHub sign-in, history ownership is an anonymous browser cookie, not an account.
 * `node:sqlite` may print an experimental-feature warning on some Node versions.
 
 ## Roadmap
 
-* "Sign in with GitHub" so history follows you across devices (needs an OAuth app; the storage layer is already owner-scoped).
-* Fault schedules and chaos "game days".
+* Reusable, shareable game-day files and a library of community scenarios.
 * Network partition and clock-skew faults; rate limiting and backpressure in the model.
 * Archive raw event logs for exact historical results across engine versions.
 * Pluggable pipeline definitions and user-supplied processing code.
