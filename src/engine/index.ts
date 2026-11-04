@@ -8,3 +8,6 @@ export * from "./run";
 export * from "./insights";
 export * from "./report";
 export * from "./suite";
+export { DEFAULT_PIPELINE, resolvePipeline, pipelineSchema, type ResolvedPipeline } from "./pipeline";
+export * from "./suitefile";
+export * from "./junit";

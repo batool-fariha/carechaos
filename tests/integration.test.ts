@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildReport, reportToMarkdown, runComparison, runExperiment, SCENARIOS, scenarioConfig, REPORT_SCHEMA_VERSION } from "@/engine";
 
 describe("scenario library", () => {
-  it("has at least seven scenarios with full metadata", () => {
-    expect(SCENARIOS.length).toBeGreaterThanOrEqual(7);
+  it("has at least eight scenarios with full metadata", () => {
+    expect(SCENARIOS.length).toBeGreaterThanOrEqual(8);
     for (const s of SCENARIOS) {
       expect(s.hypothesis.length).toBeGreaterThan(20);
       expect(s.assertions.length).toBeGreaterThan(2);
@@ -29,6 +29,7 @@ describe("scenario library", () => {
     "packet-loss": ["gaps"],
     "recovery-backlog": ["backlog", "after-recovery", "no-unexpected-loss"],
     "out-of-order": ["no-overwrite"],
+    "game-day": ["g-processed", "g-dup", "g-dup-alerts", "g-stale", "g-queue", "g-after", "g-gaps", "no-unexpected-loss"],
   };
   for (const [id, ids] of Object.entries(expectedFaultyFailures)) {
     it(`${id}: faulty reference mode fails exactly the intended assertions`, () => {

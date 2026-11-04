@@ -146,7 +146,7 @@ test("new experiment form validates, creates, runs and appears in history", asyn
 
 test("scenario library lists all scenarios and navigation works", async ({ page }) => {
   await page.goto("/scenarios");
-  await expect(page.locator('[data-testid^="scenario-"]')).toHaveCount(7);
+  await expect(page.locator('[data-testid^="scenario-"]')).toHaveCount(8);
   await page.getByRole("link", { name: "Open in lab" }).first().click();
   await expect(page.getByTestId("run-demo")).toBeVisible();
   await page.getByRole("link", { name: "About" }).click();

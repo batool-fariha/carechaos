@@ -6,31 +6,33 @@ import type { Metrics } from "./metrics";
 import { INTENTIONAL_REASONS, PENDING_REASONS, ratio, type Ratio } from "./metrics";
 import type { FaultConfig, ServiceId, SimulationResult } from "./types";
 
-export type AssertionKind =
-  | "all_processed"
-  | "all_alerts_delivered"
-  | "no_unexpected_loss"
-  | "accounted_for"
-  | "healthy_throughout"
-  | "p95_alert_latency_max"
-  | "service_unavailable_during_fault"
-  | "no_work_during_outage"
-  | "queue_visible_during_outage"
-  | "processed_after_recovery"
-  | "recovery_time_max"
-  | "queue_drains"
-  | "peak_queue_at_least"
-  | "duplicates_all_rejected"
-  | "no_duplicate_alerts_delivered"
-  | "latency_reflects_delay"
-  | "stale_flagged_when_delayed"
-  | "latency_recovers"
-  | "target_degraded_during_latency"
-  | "loss_rate_within"
-  | "gaps_detected"
-  | "no_stale_overwrite"
-  | "reordering_observed"
-  | "event_time_preserved";
+export const ASSERTION_KINDS = [
+  "all_processed",
+  "all_alerts_delivered",
+  "no_unexpected_loss",
+  "accounted_for",
+  "healthy_throughout",
+  "p95_alert_latency_max",
+  "service_unavailable_during_fault",
+  "no_work_during_outage",
+  "queue_visible_during_outage",
+  "processed_after_recovery",
+  "recovery_time_max",
+  "queue_drains",
+  "peak_queue_at_least",
+  "duplicates_all_rejected",
+  "no_duplicate_alerts_delivered",
+  "latency_reflects_delay",
+  "stale_flagged_when_delayed",
+  "latency_recovers",
+  "target_degraded_during_latency",
+  "loss_rate_within",
+  "gaps_detected",
+  "no_stale_overwrite",
+  "reordering_observed",
+  "event_time_preserved",
+] as const;
+export type AssertionKind = (typeof ASSERTION_KINDS)[number];
 
 export interface AssertionSpec {
   id: string;
@@ -247,7 +249,14 @@ const checks: Record<AssertionKind, (c: Ctx) => Verdict> = {
     if (!faults.length) return na();
     const f = faults[0];
     const max = spec.params?.maxSec ?? 2;
-    const after = r.events.filter((e) => e.eventTime >= endOf(f, r) && e.processedAt !== null).map((e) => (e.processedAt as number) - e.eventTime);
+    // Readings generated while another outage (or its recovery) was in progress are excluded: their delay is not the latency fault's.
+    const confounded = faultsOf(r, "outage").map((o) => {
+      const rec = r.services[o.target].recoveries.find((x) => x.initiatedAt >= o.startSec - 0.001);
+      return [o.startSec, Math.max(endOf(o, r), rec?.completedAt ?? r.config.durationSec)] as const;
+    });
+    const after = r.events
+      .filter((e) => e.eventTime >= endOf(f, r) && e.processedAt !== null && !confounded.some(([a, b]) => e.eventTime >= a && e.eventTime <= b))
+      .map((e) => (e.processedAt as number) - e.eventTime);
     if (!after.length) return na();
     const worst = Math.max(...after);
     return verdict(worst <= max, `readings generated after the fault ends return to ≤ ${max}s latency`, `${after.length} later readings, worst latency ${sec(worst)}`);

@@ -10,6 +10,7 @@
  *   -1 fault start/end, 0 pipeline activity, 1 operator interventions, 2 sampling, 3 end-of-run.
  */
 import { makeRng, randRange, type Rng } from "./prng";
+import { resolvePipeline, type ResolvedPipeline } from "./pipeline";
 import {
   MEASUREMENT_UNITS,
   SERVICE_IDS,
@@ -31,12 +32,7 @@ import {
   type TimelineEntry,
 } from "./types";
 
-/** Illustrative alert rules for fictional demo data. NOT medically validated thresholds. */
-export const ALERT_RULES: Record<Measurement, { label: string; breaches: (v: number) => boolean }> = {
-  heart_rate: { label: "heart_rate > 120 bpm", breaches: (v) => v > 120 },
-  oxygen_saturation: { label: "oxygen_saturation < 90 %", breaches: (v) => v < 90 },
-  systolic_bp: { label: "systolic_bp > 160 mmHg", breaches: (v) => v > 160 },
-};
+export { ALERT_RULES, BASE_CAPACITY_PER_SEC } from "./pipeline";
 const MEASUREMENTS: Measurement[] = ["heart_rate", "oxygen_saturation", "systolic_bp"];
 const NORMAL_RANGE: Record<Measurement, [number, number]> = {
   heart_rate: [58, 104],
@@ -50,21 +46,7 @@ const BREACH_RANGE: Record<Measurement, [number, number]> = {
 };
 const BREACH_PROBABILITY = 0.15;
 
-export const BASE_CAPACITY_PER_SEC: Record<ServiceId, number> = {
-  device: 100,
-  ingestion: 40,
-  processor: 20,
-  rules: 20,
-  delivery: 10,
-  dashboard: Infinity,
-};
-const QUEUE_CAPACITY = 1000;
-const MAX_RETRIES = 8;
-const RETRY_BASE_MS = 1000;
-const RETRY_CAP_MS = 8000;
 const DUPLICATE_DELAY_MS = 1000;
-const RECOVERY_WARMUP_MS = 2000;
-const DEGRADED_QUEUE_DEPTH = 25;
 const SAMPLE_MS = 1000;
 
 export const NEXT_HOP: Partial<Record<ServiceId, ServiceId>> = {
@@ -192,6 +174,7 @@ export class Simulation {
   private activeFaults!: ActiveFault[];
   private faultOrd = 0;
   private genRng!: Rng;
+  private pipe!: ResolvedPipeline;
   private counters!: SimulationResult["counters"];
   private gapTracker!: Map<number, { maxSeq: number; open: Set<number> }>;
   private reconGaps: string[] = [];
@@ -218,6 +201,7 @@ export class Simulation {
     this.activeFaults = [];
     this.faultOrd = 0;
     this.genRng = makeRng(this.config.seed, "generator");
+    this.pipe = resolvePipeline(this.config);
     this.counters = {
       duplicatesInjected: 0,
       duplicatesRejected: 0,
@@ -374,7 +358,7 @@ export class Simulation {
       eventTime: this.nowSec,
       arrivalTime: null,
       status: "generated",
-      expectedAlert: ALERT_RULES[measurement].breaches(value),
+      expectedAlert: this.pipe.rules[measurement].breaches(value),
       processedAt: null,
       alertGeneratedAt: null,
       deliveredAt: null,
@@ -492,7 +476,7 @@ export class Simulation {
         return;
       }
       item.failures++;
-      if (item.failures > MAX_RETRIES) {
+      if (item.failures > this.pipe.maxRetries) {
         svc.dlq.push(item);
         svc.peakDepth = Math.max(svc.peakDepth, svc.depth);
         if (item.copy === 0) {
@@ -501,14 +485,14 @@ export class Simulation {
           rec.deadLettered = true;
         }
         svc.failed++;
-        this.emit(item, to, "dead_lettered", "failed", `Retries exhausted (${MAX_RETRIES}) while ${to} was unavailable; moved to dead-letter queue for redrive on recovery.`);
+        this.emit(item, to, "dead_lettered", "failed", `Retries exhausted (${this.pipe.maxRetries}) while ${to} was unavailable; moved to dead-letter queue for redrive on recovery.`);
         return;
       }
-      const backoff = Math.min(RETRY_BASE_MS * 2 ** (item.failures - 1), RETRY_CAP_MS);
+      const backoff = Math.min(this.pipe.retryBaseMs * 2 ** (item.failures - 1), this.pipe.retryCapMs);
       svc.held++;
       svc.peakDepth = Math.max(svc.peakDepth, svc.depth);
       if (item.copy === 0) rec.retries++;
-      this.emit(item, to, "retry_scheduled", "queued", `${to} unavailable; retry ${item.failures}/${MAX_RETRIES} in ${fmt(backoff / 1000)}s (exponential backoff).`);
+      this.emit(item, to, "retry_scheduled", "queued", `${to} unavailable; retry ${item.failures}/${this.pipe.maxRetries} in ${fmt(backoff / 1000)}s (exponential backoff).`);
       this.after(backoff, () => {
         svc.held--;
         this.arrive(item, to);
@@ -516,8 +500,8 @@ export class Simulation {
       });
       return;
     }
-    if (svc.queue.length >= QUEUE_CAPACITY) {
-      this.drop(item, to, "queue_overflow", `${to} inbound queue is full (${QUEUE_CAPACITY}); event dropped.`);
+    if (svc.queue.length >= this.pipe.queueCapacity) {
+      this.drop(item, to, "queue_overflow", `${to} inbound queue is full (${this.pipe.queueCapacity}); event dropped.`);
       return;
     }
     svc.received++;
@@ -536,8 +520,8 @@ export class Simulation {
   // ---------------------------------------------------------------- workers
 
   private capacity(svc: Service): number {
-    const base = BASE_CAPACITY_PER_SEC[svc.id];
-    if (svc.id === "dashboard") return Infinity;
+    const base = this.pipe.capacity[svc.id];
+    if (base === Infinity) return Infinity;
     return svc.recoverySince !== null ? this.config.drainCapacityPerSec : base;
   }
 
@@ -596,9 +580,9 @@ export class Simulation {
       }
       case "rules": {
         svc.processed++;
-        if (!ALERT_RULES[rec.measurement].breaches(rec.value)) return;
+        if (!this.pipe.rules[rec.measurement].breaches(rec.value)) return;
         if (rec.alertGeneratedAt === null) rec.alertGeneratedAt = this.nowSec;
-        this.emit(item, "rules", "alert_generated", "alert_generated", `Rule fired: ${ALERT_RULES[rec.measurement].label} (value ${rec.value}).`);
+        this.emit(item, "rules", "alert_generated", "alert_generated", `Rule fired: ${this.pipe.rules[rec.measurement].label} (value ${rec.value}).`);
         return this.send({ ...item, kind: "alert", failures: 0 }, "rules", "delivery");
       }
       case "delivery":
@@ -721,7 +705,7 @@ export class Simulation {
     svc.outageDepth = Math.max(0, this.activeFaults.filter((a) => a.fault.type === "outage" && a.fault.target === svc.id).length);
     if (svc.outageDepth > 0) return;
     svc.recoverySince = this.nowMs;
-    svc.warmupUntil = this.nowMs + RECOVERY_WARMUP_MS;
+    svc.warmupUntil = this.nowMs + this.pipe.warmupMs;
     svc.recoveries.push({ service: svc.id, initiatedAt: this.nowSec, completedAt: null, trigger });
     this.note("recovery_initiated", `${svc.id} restored (${trigger}); draining backlog at ${this.config.drainCapacityPerSec}/s.`, svc.id);
     const redrive = svc.dlq.splice(0);
@@ -739,7 +723,7 @@ export class Simulation {
     let next: Health;
     let reason: string;
     const degraded = () =>
-      this.activeFaults.some((a) => a.fault.type === "latency" && a.fault.target === svc.id) || svc.queue.length >= DEGRADED_QUEUE_DEPTH;
+      this.activeFaults.some((a) => a.fault.type === "latency" && a.fault.target === svc.id) || svc.queue.length >= this.pipe.degradedDepth;
     if (svc.outageDepth > 0) {
       next = "unavailable";
       reason = "outage fault active";
@@ -757,7 +741,7 @@ export class Simulation {
       }
     } else if (degraded()) {
       next = "degraded";
-      reason = svc.queue.length >= DEGRADED_QUEUE_DEPTH ? `queue depth ≥ ${DEGRADED_QUEUE_DEPTH}` : "latency fault active";
+      reason = svc.queue.length >= this.pipe.degradedDepth ? `queue depth ≥ ${this.pipe.degradedDepth}` : "latency fault active";
     } else {
       next = "healthy";
       reason = "no active faults, queue within limits";
@@ -835,7 +819,7 @@ export class Simulation {
         duplicatesRejected: s.duplicatesRejected,
         queueDepth: s.depth,
         peakQueueDepth: s.peakDepth,
-        capacityPerSec: BASE_CAPACITY_PER_SEC[id],
+        capacityPerSec: this.pipe.capacity[id],
         transitions: s.transitions,
         recoveries: s.recoveries,
         activeFaults: this.activeFaults.filter((a) => a.fault.target === id).map((a) => a.fault),

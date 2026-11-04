@@ -1,0 +1,47 @@
+name: CareChaos
+description: Run chaos experiments against your own patient-monitoring pipeline profile (simulation only) and fail the build if an assertion breaks.
+author: Fariha Batool
+branding:
+  icon: activity
+  color: green
+inputs:
+  files:
+    description: Experiment file(s), space separated (JSON). See examples/ in the CareChaos repo.
+    required: false
+    default: carechaos.json
+  mode:
+    description: resilient, faulty or both
+    required: false
+    default: resilient
+  strict:
+    description: Count weak-mode (faulty) failures against the build too
+    required: false
+    default: "false"
+  junit:
+    description: Path to write JUnit XML to
+    required: false
+    default: carechaos-junit.xml
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+    - name: Install CareChaos
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --ignore-scripts
+    - name: Run experiments
+      shell: bash
+      env:
+        CC_FILES: ${{ inputs.files }}
+        CC_MODE: ${{ inputs.mode }}
+        CC_STRICT: ${{ inputs.strict }}
+        CC_JUNIT: ${{ inputs.junit }}
+      run: |
+        FILES=()
+        for f in $CC_FILES; do FILES+=("$GITHUB_WORKSPACE/$f"); done
+        ARGS=(--mode "$CC_MODE" --junit "$GITHUB_WORKSPACE/$CC_JUNIT" --summary "$GITHUB_STEP_SUMMARY")
+        if [ "$CC_STRICT" = "true" ]; then ARGS+=(--strict); fi
+        cd "${{ github.action_path }}"
+        npx tsx scripts/carechaos.ts run "${FILES[@]}" "${ARGS[@]}"

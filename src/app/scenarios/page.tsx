@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SCENARIOS, describeFault } from "@/engine";
 import { Card, linkButtonClass } from "@/components/ui";
+import { FaultTimeline } from "@/components/FaultTimeline";
 
 export default function Scenarios() {
   return (
@@ -19,6 +20,7 @@ export default function Scenarios() {
               <div>
                 <b>Fault configuration:</b>
                 <ul className="list-disc pl-5 text-mute">{s.faults.length ? s.faults.map((f, i) => <li key={i}>{describeFault(f)}</li>) : <li>None</li>}</ul>
+                {s.faults.length > 1 && <div className="mt-3"><FaultTimeline faults={s.faults} durationSec={s.overrides.durationSec ?? 300} /></div>}
               </div>
               <p><b>Expected behavior:</b> <span className="text-mute">{s.expectedBehavior}</span></p>
               <div>

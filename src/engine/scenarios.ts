@@ -217,6 +217,11 @@ export function assertionsFor(config: ExperimentConfig): AssertionSpec[] {
     const st = [...new Set(scenario.faults.map((f) => f.type))].sort();
     if (st.join() === types.join()) return scenario.assertions;
   }
+  return generatedAssertions(types);
+}
+
+/** Assertions derived from the fault types present (used for custom experiments and game days). */
+export function generatedAssertions(types: FaultType[]): AssertionSpec[] {
   const specs: AssertionSpec[] = [];
   if (!types.length) {
     specs.push(a("g-healthy", "healthy_throughout", "All services remain healthy throughout"), a("g-p95", "p95_alert_latency_max", "p95 end-to-end alert latency ≤ 2s", { maxSec: 2 }));
@@ -227,3 +232,25 @@ export function assertionsFor(config: ExperimentConfig): AssertionSpec[] {
   specs.push(...COMMON);
   return specs;
 }
+
+const GAME_DAY_FAULTS = [
+  makeFault({ type: "latency", target: "processor", startSec: 30, durationSec: 50, delaySec: 15, intensity: 1 }),
+  makeFault({ type: "duplicate", target: "ingestion", startSec: 60, durationSec: 150, intensity: 0.3 }),
+  makeFault({ type: "outage", target: "delivery", startSec: 100, durationSec: 50 }),
+  makeFault({ type: "packet_loss", target: "ingestion", startSec: 160, durationSec: 80, intensity: 0.1 }),
+  makeFault({ type: "outage", target: "processor", startSec: 220, durationSec: 30 }),
+];
+
+/** A "bad afternoon": five overlapping and consecutive faults in one run. */
+SCENARIOS.push({
+  id: "game-day",
+  name: "Game day: a bad afternoon",
+  description: "Five failures in one run: a slow processor, duplicate deliveries, a delivery outage, packet loss and a processor outage.",
+  hypothesis: "A resilient pipeline absorbs a sequence of unrelated failures: nothing is lost except what the experiment drops on purpose, every duplicate is rejected, and each outage drains after recovery.",
+  initialConditions: "300 readings at 1 per second over a 420 s window. Faults start and stop on a schedule, some overlapping (see the timeline).",
+  expectedBehavior: "Each fault shows its own impact and recovery. The only losses are the injected packet loss. All queues are empty at the end.",
+  relevantMetrics: ["Recovery time per outage", "Duplicate rejection rate", "Observed loss rate", "Peak queue depth"],
+  faults: GAME_DAY_FAULTS,
+  overrides: { eventCount: 300, durationSec: 420 },
+  assertions: generatedAssertions([...new Set(GAME_DAY_FAULTS.map((f) => f.type))].sort() as FaultType[]),
+});

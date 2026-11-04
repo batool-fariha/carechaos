@@ -1,7 +1,8 @@
 "use client";
 import clsx from "clsx";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
 
 const links = [
@@ -12,6 +13,16 @@ const links = [
 
 export function Nav() {
   const path = usePathname();
+  const router = useRouter();
+  const [auth, setAuth] = useState<{ enabled: boolean; user: { login: string } | null } | null>(null);
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then(setAuth).catch(() => setAuth(null));
+  }, [path]);
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setAuth((a) => (a ? { ...a, user: null } : a));
+    router.refresh();
+  }
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:rounded focus:bg-teal focus:px-3 focus:py-1 focus:text-bg">
@@ -39,6 +50,16 @@ export function Nav() {
             );
           })}
         </nav>
+        {auth?.enabled && (
+          auth.user ? (
+            <span className="flex items-center gap-2 text-sm" data-testid="auth-user">
+              <span className="text-mute">@{auth.user.login}</span>
+              <button onClick={signOut} className="rounded border border-line px-2 py-0.5 text-xs text-mute hover:text-ink" data-testid="sign-out">Sign out</button>
+            </span>
+          ) : (
+            <a href="/api/auth/github" className="rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-medium hover:border-mute/50" data-testid="sign-in">Sign in with GitHub</a>
+          )
+        )}
         <a href="https://github.com/batool-fariha/carechaos" target="_blank" rel="noreferrer" className="text-sm text-mute hover:text-ink">
           GitHub ↗
         </a>

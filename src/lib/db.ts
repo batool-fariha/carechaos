@@ -32,6 +32,7 @@ interface Store {
   put(r: Raw): Promise<void>;
   remove(id: string): Promise<void>;
   clear(owner: string): Promise<number>;
+  claim(from: string, to: string): Promise<number>;
 }
 
 const COLUMNS = ["id", "created_at", "updated_at", "name", "scenario_id", "mode", "seed", "status", "verdict", "summary_json", "config_json", "owner"] as const;
@@ -76,6 +77,7 @@ async function createStore(): Promise<Store> {
       put: async (r) => void (await sql.unsafe(UPSERT_SQL((i) => `$${i}`), COLUMNS.map((c) => r[c]) as never[])),
       remove: async (id) => void (await sql.unsafe("DELETE FROM experiments WHERE id = $1", [id])),
       clear: async (owner) => (await sql.unsafe("DELETE FROM experiments WHERE owner = $1", [owner])).count,
+      claim: async (from, to) => (await sql.unsafe("UPDATE experiments SET owner = $2 WHERE owner = $1", [from, to])).count,
     };
   }
   const file = dbPath();
@@ -93,6 +95,7 @@ async function createStore(): Promise<Store> {
     put: async (r) => void db.prepare(UPSERT_SQL(() => "?")).run(...COLUMNS.map((c) => r[c] as string | number | null)),
     remove: async (id) => void db.prepare("DELETE FROM experiments WHERE id = ?").run(id),
     clear: async (owner) => Number(db.prepare("DELETE FROM experiments WHERE owner = ?").run(owner).changes),
+    claim: async (from, to) => Number(db.prepare("UPDATE experiments SET owner = ? WHERE owner = ?").run(to, from).changes),
   };
 }
 
@@ -219,4 +222,9 @@ export async function deleteExperiment(id: string, owner: string): Promise<boole
 
 export async function clearExperiments(owner: string): Promise<number> {
   return (await getStore()).clear(owner);
+}
+
+/** Moves experiments from an anonymous browser ID to a signed-in account. Returns how many moved. */
+export async function claimExperiments(from: string, to: string): Promise<number> {
+  return (await getStore()).claim(from, to);
 }

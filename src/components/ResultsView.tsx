@@ -6,6 +6,7 @@ import { download } from "@/lib/download";
 import { fmtPct, fmtSec, humanize } from "@/lib/format";
 import { HealthStrip, HistogramChart, LatencyChart, OutcomeChart, QueueChart } from "./Charts";
 import { EventTrace } from "./EventStream";
+import { FaultTimeline } from "./FaultTimeline";
 import { HeadlineMetrics, MoreMetrics } from "./MetricsGrid";
 import { Button, Card, Disclosure, Empty, Pill, StatusBadge, linkButtonClass } from "./ui";
 import { narrate } from "@/lib/narrate";
@@ -94,7 +95,8 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
             )}
           </div>
           <div>
-            <h3 className="text-xs uppercase tracking-wider text-mute">Operator actions</h3>
+            {r.config.pipeline && <p className="mt-2 text-xs text-mute">Custom pipeline profile applied (capacities, retries, queue limits or alert rules).</p>}
+            <h3 className="mt-3 text-xs uppercase tracking-wider text-mute">Operator actions</h3>
             {r.config.interventions.length === 0 ? <p>None.</p> : <ul className="mt-1 list-disc pl-4">{r.config.interventions.map((iv, i) => <li key={i}>t={iv.atSec.toFixed(1)}s — {iv.type}{iv.type === "recover" ? ` ${iv.service}` : ""}</li>)}</ul>}
           </div>
           <div>
@@ -105,6 +107,11 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
         </div>
       </Card>
 
+      {r.config.faults.length > 1 && (
+        <Card title="Fault schedule">
+          <FaultTimeline faults={r.config.faults} durationSec={config.durationSec} />
+        </Card>
+      )}
       <HeadlineMetrics m={m} started waiting={m.finalQueueDepth} />
       <Disclosure title="More numbers"><MoreMetrics m={m} started /></Disclosure>
 

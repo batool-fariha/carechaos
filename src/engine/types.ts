@@ -58,6 +58,27 @@ export type Intervention =
   | { atSec: number; type: "inject"; fault: FaultConfig }
   | { atSec: number; type: "stop" };
 
+export interface AlertRuleConfig {
+  op: ">" | "<";
+  threshold: number;
+}
+
+/** Optional overrides describing your own pipeline. Anything omitted uses the built-in default. */
+export interface PipelineConfig {
+  /** Events per second each stage can process (the Clinician Dashboard defaults to instant). */
+  capacities?: Partial<Record<ServiceId, number>>;
+  /** Inbound queue limit per stage (default 1000). Overflow is dropped with a recorded reason. */
+  queueCapacity?: number;
+  /** Resilient-mode sender retry policy: bounded retries with exponential backoff. */
+  retry?: { maxRetries: number; baseSec: number; capSec: number };
+  /** Seconds a restored service stays in the recovering state at minimum (default 2). */
+  recoveryWarmupSec?: number;
+  /** A stage is marked degraded when its queue reaches this depth (default 25). */
+  degradedQueueDepth?: number;
+  /** Alert rule per measurement, e.g. heart_rate > 120. */
+  alertRules?: Partial<Record<Measurement, AlertRuleConfig>>;
+}
+
 export interface ExperimentConfig {
   name: string;
   scenarioId: string;
@@ -75,6 +96,8 @@ export interface ExperimentConfig {
   patientCount: number;
   /** Age (virtual s) beyond which data is flagged stale in resilient mode. */
   staleThresholdSec: number;
+  /** Your pipeline's capacities, retry policy and alert rules. Omit to use the defaults. */
+  pipeline?: PipelineConfig;
   /** Operator actions recorded during a live run (manual recovery, live fault injection, stop). */
   interventions: Intervention[];
 }

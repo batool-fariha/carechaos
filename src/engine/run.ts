@@ -1,4 +1,4 @@
-import { assertionPassRate, evaluateAssertions, type AssertionOutcome } from "./assertions";
+import { assertionPassRate, evaluateAssertions, type AssertionOutcome, type AssertionSpec } from "./assertions";
 import { computeMetrics, type Metrics } from "./metrics";
 import { assertionsFor } from "./scenarios";
 import { Simulation } from "./simulation";
@@ -14,23 +14,23 @@ export interface Evaluation {
   verdict: Verdict;
 }
 
-export function evaluate(result: SimulationResult): Evaluation {
+export function evaluate(result: SimulationResult, specs?: AssertionSpec[]): Evaluation {
   const metrics = computeMetrics(result);
   if (result.status !== "completed") {
     return { result, metrics, assertions: [], verdict: "inconclusive" };
   }
-  const assertions = evaluateAssertions(result, metrics, assertionsFor(result.config));
+  const assertions = evaluateAssertions(result, metrics, specs ?? assertionsFor(result.config));
   metrics.assertionPassRate = assertionPassRate(assertions);
   const failed = assertions.some((a) => a.status === "failed");
   return { result, metrics, assertions, verdict: failed ? "failed" : "passed" };
 }
 
 /** Run a configuration to completion (honoring recorded interventions) and evaluate it. */
-export function runExperiment(config: ExperimentConfig): Evaluation {
+export function runExperiment(config: ExperimentConfig, specs?: AssertionSpec[]): Evaluation {
   const sim = new Simulation(config);
   sim.start();
   sim.advanceTo(config.durationSec);
-  return evaluate(sim.getResult());
+  return evaluate(sim.getResult(), specs);
 }
 
 export interface Comparison {

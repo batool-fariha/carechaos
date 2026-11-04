@@ -70,3 +70,34 @@ describe("rate limiter", () => {
     expect(rateLimit("k1", 5, 60_000, t0 + 61_000).ok).toBe(true);
   });
 });
+
+import { signSession, verifySession } from "@/lib/session";
+
+describe("signed sessions", () => {
+  const secret = "s".repeat(40);
+  const base = { uid: "gh:42", login: "octo", exp: Date.now() + 60_000 };
+  it("round-trips a valid session", () => {
+    expect(verifySession(signSession(base, secret), secret)).toEqual(base);
+  });
+  it("rejects tampering, wrong secrets, expiry, malformed tokens and non-GitHub IDs", () => {
+    const tok = signSession(base, secret);
+    const [body, sig] = tok.split(".");
+    const forged = Buffer.from(JSON.stringify({ ...base, uid: "gh:1" })).toString("base64url");
+    expect(verifySession(`${forged}.${sig}`, secret)).toBeNull();
+    expect(verifySession(tok, "t".repeat(40))).toBeNull();
+    expect(verifySession(signSession({ ...base, exp: 1 }, secret), secret)).toBeNull();
+    expect(verifySession(undefined, secret)).toBeNull();
+    expect(verifySession("garbage", secret)).toBeNull();
+    expect(verifySession(`${body}.`, secret)).toBeNull();
+    expect(verifySession(signSession({ ...base, uid: "anon:1" }, secret), secret)).toBeNull();
+  });
+  it("claims anonymous experiments for an account", async () => {
+    const db = await import("@/lib/db");
+    const { scenarioConfig } = await import("@/engine");
+    const row = await db.saveExperiment(scenarioConfig("healthy-baseline", { name: "claim me" }), "completed", A);
+    expect(await db.claimExperiments(A, "gh:99")).toBeGreaterThanOrEqual(1);
+    expect((await db.getExperiment(row.id))?.owner).toBe("gh:99");
+    expect(await db.deleteExperiment(row.id, A)).toBe(false);
+    expect(await db.deleteExperiment(row.id, "gh:99")).toBe(true);
+  });
+});

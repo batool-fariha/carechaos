@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { pipelineSchema } from "./pipeline";
 import { SERVICE_IDS, type ExperimentConfig, type FaultConfig } from "./types";
 
 export const APP_VERSION = "0.1.0";
 export const ENGINE_VERSION = "1";
+
+export const MAX_FAULTS = 12;
 
 export const faultSchema = z.object({
   type: z.enum(["latency", "duplicate", "outage", "packet_loss", "out_of_order"]),
@@ -27,10 +30,11 @@ export const configSchema = z.object({
   intervalSec: z.number().min(0.1, "Reading interval must be at least 0.1 s.").max(60),
   durationSec: z.number().min(10, "Simulation duration must be at least 10 s.").max(3600, "Simulation duration is capped at 3600 s."),
   mode: z.enum(["resilient", "faulty"]),
-  faults: z.array(faultSchema).max(4, "At most 4 faults per experiment."),
+  faults: z.array(faultSchema).max(MAX_FAULTS, `At most ${MAX_FAULTS} faults per experiment.`),
   drainCapacityPerSec: z.number().min(0.5).max(200),
   patientCount: z.number().int().min(1).max(12),
   staleThresholdSec: z.number().min(1).max(600),
+  pipeline: pipelineSchema.optional(),
   interventions: z.array(interventionSchema).max(100),
 });
 
