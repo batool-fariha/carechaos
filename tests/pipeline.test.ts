@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeMetrics, evaluate, validateConfig, resolvePipeline } from "@/engine";
+import { buildReport, computeMetrics, evaluate, validateConfig, resolvePipeline } from "@/engine";
 import { cfg, makeFault, run } from "./helpers";
 
 describe("bring-your-own pipeline profile", () => {
@@ -59,5 +59,46 @@ describe("bring-your-own pipeline profile", () => {
   it("same pipeline + seed is reproducible", () => {
     const c = cfg({ pipeline: { capacities: { processor: 3, delivery: 4 } } }, [makeFault({ type: "latency", target: "rules", startSec: 5, durationSec: 20, delaySec: 4, intensity: 1 })]);
     expect(JSON.stringify(run(c).events)).toBe(JSON.stringify(run(c).events));
+  });
+});
+
+describe("dead-letter redrive option", () => {
+  const outage = [makeFault({ type: "outage", target: "delivery", startSec: 20, durationSec: 40 })];
+  const retry = { maxRetries: 2, baseSec: 5, capSec: 5 };
+
+  it("with redrive (default) exhausted events are parked and delivered after recovery", () => {
+    const r = run(cfg({ pipeline: { retry } }, outage));
+    const m = computeMetrics(r);
+    expect(r.events.some((e) => e.deadLettered)).toBe(true);
+    expect(m.alertsDelivered).toBe(m.alertsExpected);
+  });
+
+  it("without redrive, exhausted events are discarded, recorded with a reason, and never delivered", () => {
+    const r = run(cfg({ pipeline: { retry, deadLetterRedrive: false } }, outage));
+    const m = computeMetrics(r);
+    expect(r.events.some((e) => e.deadLettered)).toBe(false);
+    expect(m.alertsDelivered).toBeLessThan(m.alertsExpected);
+    expect(m.alertLoss.byReason["retries_exhausted"]).toBeGreaterThan(0);
+    expect(m.finalQueueDepth).toBe(0);
+    const lost = r.events.find((e) => e.lossReason === "retries_exhausted")!;
+    expect(lost.status).toBe("failed");
+    expect(lost.transitions.at(-1)!.reason).toMatch(/discarded/);
+    const ev = evaluate(r);
+    expect(ev.assertions.find((a) => a.kind === "no_unexpected_loss")?.status).toBe("failed");
+  });
+
+  it("a retry window longer than the outage rides it out even without redrive", () => {
+    const r = run(cfg({ pipeline: { retry: { maxRetries: 10, baseSec: 5, capSec: 5 }, deadLetterRedrive: false } }, outage));
+    const m = computeMetrics(r);
+    expect(m.alertsDelivered).toBe(m.alertsExpected);
+  });
+
+  it("is a boolean in the schema and appears as a failure mode with a recommendation", () => {
+    expect(validateConfig(cfg({ pipeline: { deadLetterRedrive: false } })).ok).toBe(true);
+    expect(validateConfig({ ...cfg(), pipeline: { deadLetterRedrive: "no" } }).ok).toBe(false);
+    const r = run(cfg({ pipeline: { retry, deadLetterRedrive: false } }, outage));
+    const rep = buildReport(evaluate(r), { experimentId: "x", runTimestamp: "t" });
+    expect(rep.failureModes.map((f) => f.id)).toContain("retries-exhausted-discarded");
+    expect(rep.recommendations.map((x) => x.id)).toContain("rec-retries-exhausted-discarded");
   });
 });

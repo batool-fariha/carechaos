@@ -35,6 +35,7 @@ export const pipelineSchema = z
     capacities: z.object({ device: capacity, ingestion: capacity, processor: capacity, rules: capacity, delivery: capacity, dashboard: capacity }).partial().strict(),
     queueCapacity: z.number().int().min(1, "Queue capacity must be at least 1.").max(100000),
     retry: z.object({ maxRetries: z.number().int().min(0).max(50), baseSec: z.number().min(0.1).max(60), capSec: z.number().min(0.1).max(600) }),
+    deadLetterRedrive: z.boolean(),
     recoveryWarmupSec: z.number().min(0).max(120),
     degradedQueueDepth: z.number().int().min(1).max(100000),
     alertRules: z.object({ heart_rate: ruleSchema, oxygen_saturation: ruleSchema, systolic_bp: ruleSchema }).partial().strict(),
@@ -48,6 +49,7 @@ export interface ResolvedPipeline {
   maxRetries: number;
   retryBaseMs: number;
   retryCapMs: number;
+  redrive: boolean;
   warmupMs: number;
   degradedDepth: number;
   rules: Record<Measurement, { label: string; breaches: (v: number) => boolean }>;
@@ -74,6 +76,7 @@ export function resolvePipeline(config: Pick<ExperimentConfig, "pipeline">): Res
     maxRetries: retry.maxRetries,
     retryBaseMs: Math.round(retry.baseSec * 1000),
     retryCapMs: Math.round(Math.max(retry.capSec, retry.baseSec) * 1000),
+    redrive: p.deadLetterRedrive ?? true,
     warmupMs: Math.round((p.recoveryWarmupSec ?? DEFAULT_PIPELINE.recoveryWarmupSec) * 1000),
     degradedDepth: p.degradedQueueDepth ?? DEFAULT_PIPELINE.degradedQueueDepth,
     rules,

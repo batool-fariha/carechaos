@@ -476,6 +476,15 @@ export class Simulation {
         return;
       }
       item.failures++;
+      if (item.failures > this.pipe.maxRetries && !this.pipe.redrive) {
+        if (item.copy === 0) {
+          rec.lossReason = "retries_exhausted";
+          rec.lossStage = to;
+        }
+        svc.failed++;
+        this.emit(item, to, "retries_exhausted", "failed", `Retries exhausted (${this.pipe.maxRetries}) while ${to} was unavailable; the event is discarded (no dead-letter redrive in this pipeline).`);
+        return;
+      }
       if (item.failures > this.pipe.maxRetries) {
         svc.dlq.push(item);
         svc.peakDepth = Math.max(svc.peakDepth, svc.depth);

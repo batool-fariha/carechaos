@@ -27,6 +27,9 @@ export function detectFailureModes(r: SimulationResult, m: Metrics): Insight[] {
   const crash = byReason("queue_lost_on_crash");
   if (crash.length)
     out.push({ id: "queue-lost-on-crash", title: "In-memory queue lost when a service failed", evidence: `${crash.length} queued events were lost with reason queue_lost_on_crash.`, eventIds: ids(crash) });
+  const discarded = r.events.filter((e) => e.lossReason === "retries_exhausted" && !e.deadLettered && (e.processedAt === null || (e.expectedAlert && e.deliveredAt === null)));
+  if (discarded.length)
+    out.push({ id: "retries-exhausted-discarded", title: "Events were discarded after the last retry", evidence: `${discarded.length} events exhausted their retries while a service was down and were discarded, because the pipeline has no dead-letter queue to redrive from.`, eventIds: ids(discarded) });
   const exhausted = r.events.filter((e) => e.deadLettered);
   if (exhausted.length)
     out.push({ id: "retries-exhausted", title: "Bounded retries were exhausted during a long outage", evidence: `${exhausted.length} events exhausted their retry budget and were dead-lettered; ${exhausted.filter((e) => e.processedAt !== null).length} were later redriven and processed.`, eventIds: ids(exhausted) });
@@ -58,6 +61,7 @@ export function buildRecommendations(r: SimulationResult, m: Metrics): Recommend
   };
   add("dropped-on-unavailable", "Buffer or retry instead of dropping", "Add a durable queue or bounded retry with backoff on the sender so a short outage does not become permanent data loss.");
   add("queue-lost-on-crash", "Make queues durable", "Persist the inbound queue (or use a broker) so a crash does not discard accepted events.");
+  add("retries-exhausted-discarded", "Park exhausted events instead of discarding them", "Route events that exhaust their retries to a dead-letter queue and redrive them on recovery, or extend the retry window beyond the longest outage you intend to survive.");
   add("retries-exhausted", "Review the retry budget against expected outage length", "Keep the dead-letter queue and redrive on recovery; consider a longer or circuit-breaker style retry for outages longer than the backoff window.");
   add("duplicates-accepted", "Enforce idempotency by event ID", "Track processed event IDs in the processor and alert layers so replays are rejected, and alert on duplicate-rate spikes.");
   add("stale-overwrite", "Compare event time before overwriting current values", "Only update the latest measurement when the incoming event time is newer; store late arrivals as history.");

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { pipelineSchema } from "./pipeline";
 import { SERVICE_IDS, type ExperimentConfig, type FaultConfig } from "./types";
 
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 export const ENGINE_VERSION = "1";
 
 export const MAX_FAULTS = 12;
