@@ -6,7 +6,7 @@
 |---|---|
 | Experiment ID | `exp_sample` |
 | Run timestamp | 2026-01-01T00:00:00.000Z |
-| App version | 0.1.0 (engine 1) |
+| App version | 0.1.1 (engine 1) |
 | Scenario | Alert service outage (`alert-service-outage`) |
 | Seed | 42 |
 | Resilience mode | faulty |

@@ -19,6 +19,7 @@ A JSON file describes one experiment, or a list of them. It is used by the [`car
     "capacities": { "processor": 15, "delivery": 6 },   // events/s per stage
     "queueCapacity": 500,                  // inbound queue limit per stage (default 1000)
     "retry": { "maxRetries": 8, "baseSec": 1, "capSec": 8 },
+    "deadLetterRedrive": true,             // false = events are discarded after the last retry
     "recoveryWarmupSec": 2,
     "degradedQueueDepth": 25,
     "alertRules": { "heart_rate": { "op": ">", "threshold": 130 } }

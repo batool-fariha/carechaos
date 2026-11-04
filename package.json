@@ -1,6 +1,6 @@
 {
   "name": "carechaos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Chaos engineering simulator for synthetic remote patient-monitoring pipelines",
   "license": "MIT",

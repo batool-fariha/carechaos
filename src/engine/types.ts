@@ -71,6 +71,11 @@ export interface PipelineConfig {
   queueCapacity?: number;
   /** Resilient-mode sender retry policy: bounded retries with exponential backoff. */
   retry?: { maxRetries: number; baseSec: number; capSec: number };
+  /**
+   * Resilient mode: park events whose retries are exhausted in a dead-letter queue and redrive them on recovery (default true).
+   * Set false to model a pipeline that simply discards an event after its last retry.
+   */
+  deadLetterRedrive?: boolean;
   /** Seconds a restored service stays in the recovering state at minimum (default 2). */
   recoveryWarmupSec?: number;
   /** A stage is marked degraded when its queue reaches this depth (default 25). */

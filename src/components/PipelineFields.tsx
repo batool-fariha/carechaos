@@ -18,6 +18,7 @@ export function prunePipeline(p: PipelineConfig): PipelineConfig | undefined {
   if (Object.keys(caps).length) out.capacities = caps as PipelineConfig["capacities"];
   if (p.queueCapacity !== undefined && !Number.isNaN(p.queueCapacity)) out.queueCapacity = p.queueCapacity;
   if (p.retry) out.retry = p.retry;
+  if (p.deadLetterRedrive === false) out.deadLetterRedrive = false;
   if (p.recoveryWarmupSec !== undefined && !Number.isNaN(p.recoveryWarmupSec)) out.recoveryWarmupSec = p.recoveryWarmupSec;
   if (p.degradedQueueDepth !== undefined && !Number.isNaN(p.degradedQueueDepth)) out.degradedQueueDepth = p.degradedQueueDepth;
   if (p.alertRules && Object.keys(p.alertRules).length) out.alertRules = p.alertRules;
@@ -55,6 +56,12 @@ export function PipelineFields({ value, onChange }: { value: PipelineConfig | un
               <input id="retry-base" aria-label="Backoff start seconds" type="number" min={0.1} step={0.5} className={inputClass} placeholder={String(DEFAULT_PIPELINE.retry.baseSec)} value={p.retry?.baseSec ?? ""} onChange={(e) => set({ retry: { ...retry, baseSec: Number(e.target.value) || DEFAULT_PIPELINE.retry.baseSec } })} />
               <input aria-label="Backoff cap seconds" type="number" min={0.1} step={0.5} className={inputClass} placeholder={String(DEFAULT_PIPELINE.retry.capSec)} value={p.retry?.capSec ?? ""} onChange={(e) => set({ retry: { ...retry, capSec: Number(e.target.value) || DEFAULT_PIPELINE.retry.capSec } })} />
             </div>
+          </Field>
+          <Field label="Dead-letter redrive" htmlFor="redrive" hint="Resilient mode parks exhausted events and redrives them on recovery. Untick to model discarding them.">
+            <label className="flex items-center gap-2 text-sm">
+              <input id="redrive" type="checkbox" checked={p.deadLetterRedrive ?? true} onChange={(e) => set({ deadLetterRedrive: e.target.checked ? undefined : false })} />
+              Redrive after recovery
+            </label>
           </Field>
           <Field label="Recovery warm-up (s)" htmlFor="warmup" hint="Minimum time in the recovering state.">
             <input id="warmup" type="number" min={0} step={0.5} className={inputClass} placeholder={String(DEFAULT_PIPELINE.recoveryWarmupSec)} value={p.recoveryWarmupSec ?? ""} onChange={(e) => set({ recoveryWarmupSec: num(e.target.value) })} />

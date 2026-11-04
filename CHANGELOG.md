@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- `pipeline.deadLetterRedrive: false` models a pipeline that discards an event after its last retry (no dead-letter queue). Exhausted events are recorded as lost with reason `retries_exhausted`, and the report names the failure mode and recommends a fix. Default behavior is unchanged.
+
 ## 0.1.0
 
 First public release.
