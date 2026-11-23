@@ -59,7 +59,7 @@ describe("game day scenario", () => {
   it("is in the library with five faults and passes in resilient mode", () => {
     const s = SCENARIOS.find((x) => x.id === "game-day")!;
     expect(s.faults).toHaveLength(5);
-    expect(SCENARIOS.length).toBe(8);
+    expect(SCENARIOS.length).toBe(9);
   });
 });
 

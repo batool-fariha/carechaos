@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New `clock_skew` fault: a fraction of readings is stamped ahead of when it was taken, like a device with a wrong clock. In resilient mode ingestion keeps a reading stamped more than 5 s in the future, replaces its timestamp with the arrival time and flags it, so no future-dated alert reaches clinicians unflagged; faulty mode shows it as is. Available from the fault injector, the pipeline file and a new `clock-skew` scenario (nine scenarios in all). The exported report format is unchanged.
+
 ## 0.1.2
 
 - Shortened the top-level description in `action.yml` to meet GitHub Marketplace's description-length requirement. No runtime behavior changes; inputs and defaults are unchanged. The release tag is v0.1.2, while the app's internal version stays 0.1.1.

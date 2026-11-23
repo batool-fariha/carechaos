@@ -8,6 +8,7 @@ const TYPE_LABEL: Record<FaultConfig["type"], string> = {
   outage: "Outage",
   packet_loss: "Packet loss",
   out_of_order: "Out of order",
+  clock_skew: "Clock skew",
 };
 
 /** Horizontal schedule of faults across the observation window. Bars carry text labels, not just color. */

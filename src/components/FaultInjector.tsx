@@ -9,6 +9,7 @@ export const FAULT_LABELS: Record<FaultType, string> = {
   outage: "Service outage",
   packet_loss: "Packet loss",
   out_of_order: "Out-of-order delivery",
+  clock_skew: "Device clock skew",
 };
 
 export const FAULT_HELP: Record<FaultType, string> = {
@@ -17,6 +18,7 @@ export const FAULT_HELP: Record<FaultType, string> = {
   outage: "Makes the target service unavailable. Resilient senders retry with backoff; faulty senders drop events. Recovery is only reported once the backlog drains.",
   packet_loss: "Drops a fraction of events before they reach the target service. Every drop is recorded with a reason.",
   out_of_order: "Holds a fraction of events for the hold time so newer readings overtake them. Event time is preserved.",
+  clock_skew: "Stamps a fraction of readings with a time that many seconds ahead of when they were taken, as a device with a wrong clock would. Resilient ingestion keeps the reading, replaces the timestamp with the arrival time and flags it.",
 };
 
 export function FaultFields({ fault, onChange, errors, idPrefix = "fault" }: { fault: FaultConfig; onChange: (f: FaultConfig) => void; errors?: Record<string, string>; idPrefix?: string }) {
@@ -27,7 +29,7 @@ export function FaultFields({ fault, onChange, errors, idPrefix = "fault" }: { f
       <Field label="Fault type" htmlFor={`${idPrefix}-type`} hint={FAULT_HELP[fault.type]}>
         <select id={`${idPrefix}-type`} className={inputClass} value={fault.type} onChange={(e) => {
           const type = e.target.value as FaultType;
-          set({ type, delaySec: type === "latency" ? 15 : type === "out_of_order" ? 8 : 0, intensity: type === "latency" || type === "outage" ? 1 : type === "packet_loss" ? 0.1 : 0.25, durationSec: fault.durationSec ?? 60, target: type !== "outage" && fault.target === "device" ? "ingestion" : fault.target });
+          set({ type, delaySec: type === "latency" ? 15 : type === "out_of_order" ? 8 : type === "clock_skew" ? 30 : 0, intensity: type === "latency" || type === "outage" ? 1 : type === "packet_loss" ? 0.1 : 0.25, durationSec: fault.durationSec ?? 60, target: type !== "outage" && fault.target === "device" ? "ingestion" : fault.target });
         }}>
           {(Object.keys(FAULT_LABELS) as FaultType[]).map((t) => (
             <option key={t} value={t}>{FAULT_LABELS[t]}</option>
@@ -52,8 +54,8 @@ export function FaultFields({ fault, onChange, errors, idPrefix = "fault" }: { f
           </label>
         )}
       </Field>
-      {(fault.type === "latency" || fault.type === "out_of_order") && (
-        <Field label={fault.type === "latency" ? "Added delay (s)" : "Hold time (s)"} htmlFor={`${idPrefix}-delay`} hint={fault.type === "latency" ? "Presets: 5, 15, 60." : "Must exceed the spacing between readings from one device for reordering to occur."} error={errors?.delaySec}>
+      {(fault.type === "latency" || fault.type === "out_of_order" || fault.type === "clock_skew") && (
+        <Field label={fault.type === "latency" ? "Added delay (s)" : fault.type === "clock_skew" ? "Clock skew (s ahead)" : "Hold time (s)"} htmlFor={`${idPrefix}-delay`} hint={fault.type === "latency" ? "Presets: 5, 15, 60." : "Must exceed the spacing between readings from one device for reordering to occur."} error={errors?.delaySec}>
           <div className="flex flex-wrap gap-2">
             <input id={`${idPrefix}-delay`} type="number" min={1} className={inputClass} value={fault.delaySec} onChange={(e) => set({ delaySec: Number(e.target.value) })} />
             {fault.type === "latency" && [5, 15, 60].map((d) => (
@@ -62,7 +64,7 @@ export function FaultFields({ fault, onChange, errors, idPrefix = "fault" }: { f
           </div>
         </Field>
       )}
-      {(fault.type === "packet_loss" || fault.type === "duplicate" || fault.type === "out_of_order") && (
+      {(fault.type === "packet_loss" || fault.type === "duplicate" || fault.type === "out_of_order" || fault.type === "clock_skew") && (
         <Field label={`Intensity (${Math.round(fault.intensity * 100)}% of events)`} htmlFor={`${idPrefix}-intensity`} hint="Fraction of eligible events affected, drawn from the seeded generator so runs are reproducible." error={errors?.intensity}>
           <div className="flex flex-wrap gap-2">
             <input id={`${idPrefix}-intensity`} type="number" min={1} max={100} step={1} className={inputClass} value={Math.round(fault.intensity * 100)} onChange={(e) => set({ intensity: Number(e.target.value) / 100 })} />
