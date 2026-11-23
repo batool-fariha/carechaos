@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New `network_partition` fault: the link into a service is cut for a set duration while the service itself keeps running and reports healthy, so alerts pile up silently. Resilient senders retry, report a suspected partition after two consecutive failed deliveries to a target that still reports healthy, dead-letter after the retry limit and replay the backlog when the partition heals. Faulty senders drop the events with reason `network_partition`. The partition is time-bounded and heals on its own. Available from the fault injector, the pipeline file and a new `network-partition` scenario (ten scenarios in all). The exported report format is unchanged.
+
 - New `clock_skew` fault: a fraction of readings is stamped ahead of when it was taken, like a device with a wrong clock. In resilient mode ingestion keeps a reading stamped more than 5 s in the future, replaces its timestamp with the arrival time and flags it, so no future-dated alert reaches clinicians unflagged; faulty mode shows it as is. Available from the fault injector, the pipeline file and a new `clock-skew` scenario (nine scenarios in all). The exported report format is unchanged.
 
 ## 0.1.2

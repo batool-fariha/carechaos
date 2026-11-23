@@ -79,8 +79,8 @@ Details: [docs/architecture.md](docs/architecture.md).
 
 | Area | What you get |
 |---|---|
-| Faults | Latency (5 / 15 / 60 s presets), duplicate delivery, outage (manual or timed recovery), packet loss (5 / 10 / 25 %), out-of-order delivery, device clock skew, recovery backlog with configurable drain rate |
-| Scenarios | Nine ready-made experiments, each with hypothesis, initial conditions, expected behavior, assertions and relevant metrics |
+| Faults | Latency (5 / 15 / 60 s presets), duplicate delivery, outage (manual or timed recovery), packet loss (5 / 10 / 25 %), out-of-order delivery, device clock skew, network partition, recovery backlog with configurable drain rate |
+| Scenarios | Ten ready-made experiments, each with hypothesis, initial conditions, expected behavior, assertions and relevant metrics |
 | Your pipeline | Describe your own stages' capacities, queue limits, retry policy and alert rules (form, or a small JSON file) and run the same faults against it |
 | Game days | Schedule up to 12 faults on a timeline; ready-made "bad afternoon" scenario stacks five |
 | Lab | Plain-language narrator, guided four-step tracker, live pipeline view, live fault injection, manual recovery, pause / stop / reset / replay |
@@ -215,7 +215,7 @@ docs/             architecture, experiments, metrics, report schema, API, securi
 ## Roadmap
 
 * Reusable, shareable game-day files and a library of community scenarios.
-* Network partition and clock-skew faults; rate limiting and backpressure in the model.
+* Rate limiting and backpressure in the model.
 * Archive raw event logs for exact historical results across engine versions.
 * Pluggable pipeline definitions and user-supplied processing code.
 * Light/dark toggle and screen-reader testing beyond automated checks.

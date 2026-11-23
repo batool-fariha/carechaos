@@ -53,6 +53,7 @@ export function narrate(result: SimulationResult, m: Metrics): Narration {
       duplicate: `Some messages to ${where} are being sent twice. ${resilient ? "Duplicates are rejected by event ID." : "Duplicates are accepted, so clinicians may see repeats."}`,
       packet_loss: `${Math.round(f.intensity * 100)}% of messages to ${where} are being lost on the way. ${resilient ? "Gaps are detected from sequence numbers." : "Nothing detects the gaps."}`,
       clock_skew: `Some readings sent to ${where} are stamped ${f.delaySec}s in the future by a device with a wrong clock. ${resilient ? "They are kept, re-timed to their arrival and flagged." : "Clinicians can be shown future-dated data with no warning."}`,
+      network_partition: `The link into ${where} is cut, but ${where} still reports healthy. ${resilient ? "Senders hold and retry, and flag a suspected partition." : "Events sent to it are silently dropped."}`,
       out_of_order: `Some messages to ${where} arrive out of order. ${resilient ? "Newer readings are never overwritten by older ones." : "Older readings can overwrite newer ones."}`,
     };
     return { tone: "amber", headline: "A failure is being injected", detail: text[f.type] ?? "A fault is active." };

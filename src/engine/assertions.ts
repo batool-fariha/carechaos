@@ -33,6 +33,9 @@ export const ASSERTION_KINDS = [
   "event_time_preserved",
   "clock_skew_observed",
   "future_data_flagged",
+  "partition_detected",
+  "held_during_partition",
+  "processed_after_heal",
 ] as const;
 export type AssertionKind = (typeof ASSERTION_KINDS)[number];
 
@@ -197,6 +200,51 @@ const checks: Record<AssertionKind, (c: Ctx) => Verdict> = {
     return verdict(
       missing.length === 0,
       `all ${affected.length} ${alertStage ? "alerts" : "readings"} generated during the outage are ${alertStage ? "delivered" : "processed"} after recovery`,
+      `${affected.length - missing.length}/${affected.length} completed`,
+      missing.map((e) => e.eventId),
+    );
+  },
+  partition_detected({ r }) {
+    const cuts = faultsOf(r, "network_partition");
+    if (!cuts.length) return na();
+    const f = cuts[0];
+    const end = endOf(f, r);
+    const seen = r.log.filter((l) => l.type === "partition_suspected" && l.component === f.target && l.t >= f.startSec && l.t <= end);
+    const healthy = !r.services[f.target].transitions.some((t) => t.to === "unavailable" && t.t >= f.startSec && t.t <= end);
+    return verdict(
+      seen.length > 0,
+      `the cut link into ${f.target} is reported as a suspected partition while the service itself still reports ${healthy ? "healthy" : "its own state"}`,
+      seen.length ? `suspected at ${sec(seen[0].t)}` : "never reported; the pipeline only shows a quiet service",
+    );
+  },
+  held_during_partition({ r }) {
+    const cuts = faultsOf(r, "network_partition");
+    if (!cuts.length) return na();
+    const f = cuts[0];
+    const end = endOf(f, r);
+    const cutEvents = r.log.filter((l) => l.component === f.target && l.t >= f.startSec && l.t <= end && ["retry_scheduled", "dead_lettered", "dropped"].includes(l.type));
+    if (!cutEvents.length) return na();
+    const silent = r.events.filter((e) => e.lossReason === "network_partition");
+    return verdict(
+      silent.length === 0,
+      "events that cannot cross the cut link are held for retry or dead-lettered, not dropped",
+      `${cutEvents.filter((l) => l.type !== "dropped").length} held or dead-lettered, ${silent.length} dropped`,
+      silent.map((e) => e.eventId),
+    );
+  },
+  processed_after_heal({ r }) {
+    const cuts = faultsOf(r, "network_partition");
+    if (!cuts.length) return na();
+    const f = cuts[0];
+    const end = endOf(f, r);
+    const alertStage = f.target === "delivery" || f.target === "dashboard";
+    const affected = r.events.filter((e) => e.eventTime >= f.startSec && e.eventTime < end && (!alertStage || e.expectedAlert));
+    if (!affected.length) return na();
+    const done = (e: (typeof affected)[number]) => (alertStage ? e.deliveredAt !== null : e.processedAt !== null);
+    const missing = affected.filter((e) => !done(e));
+    return verdict(
+      missing.length === 0,
+      `all ${affected.length} ${alertStage ? "alerts" : "readings"} generated during the partition are ${alertStage ? "delivered" : "processed"} after it heals`,
       `${affected.length - missing.length}/${affected.length} completed`,
       missing.map((e) => e.eventId),
     );

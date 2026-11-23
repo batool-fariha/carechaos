@@ -142,6 +142,9 @@ class Service {
   workerScheduled = false;
   nextFreeMs = 0;
   outageDepth = 0;
+  /** Consecutive failed deliveries into this service caused by a cut link (resilient mode detection). */
+  partitionFails = 0;
+  partitionSuspected = false;
   recoverySince: number | null = null;
   warmupUntil = 0;
   received = 0;
@@ -216,6 +219,8 @@ export class Simulation {
       clockSkewInjected: 0,
       clockSkewFlagged: 0,
       futureDatedDelivered: 0,
+      partitionDropped: 0,
+      partitionSuspected: 0,
     };
     this.gapTracker = new Map();
     this.reconGaps = [];
@@ -484,19 +489,27 @@ export class Simulation {
     const svc = this.services[to];
     const rec = this.byId.get(item.eventId)!;
     const resilient = this.config.mode === "resilient";
-    if (svc.outageDepth > 0) {
+    const cut = svc.outageDepth === 0 && this.partitioned(to);
+    if (svc.outageDepth > 0 || cut) {
+      const why = cut ? `the link into ${to} is cut (network partition)` : `${to} was unavailable`;
       if (!resilient) {
-        this.drop(item, to, "target_unavailable", `${to} is unavailable and the sender has no retry or buffer (faulty mode); event dropped.`);
+        if (cut) {
+          this.counters.partitionDropped++;
+          this.drop(item, to, "network_partition", `The link into ${to} is cut (network partition) and the sender has no retry or buffer (faulty mode); event dropped. ${to} still reports healthy.`);
+        } else {
+          this.drop(item, to, "target_unavailable", `${to} is unavailable and the sender has no retry or buffer (faulty mode); event dropped.`);
+        }
         return;
       }
       item.failures++;
+      if (cut) this.notePartitionFailure(svc, item);
       if (item.failures > this.pipe.maxRetries && !this.pipe.redrive) {
         if (item.copy === 0) {
           rec.lossReason = "retries_exhausted";
           rec.lossStage = to;
         }
         svc.failed++;
-        this.emit(item, to, "retries_exhausted", "failed", `Retries exhausted (${this.pipe.maxRetries}) while ${to} was unavailable; the event is discarded (no dead-letter redrive in this pipeline).`);
+        this.emit(item, to, "retries_exhausted", "failed", `Retries exhausted (${this.pipe.maxRetries}) while ${why}; the event is discarded (no dead-letter redrive in this pipeline).`);
         return;
       }
       if (item.failures > this.pipe.maxRetries) {
@@ -508,14 +521,14 @@ export class Simulation {
           rec.deadLettered = true;
         }
         svc.failed++;
-        this.emit(item, to, "dead_lettered", "failed", `Retries exhausted (${this.pipe.maxRetries}) while ${to} was unavailable; moved to dead-letter queue for redrive on recovery.`);
+        this.emit(item, to, "dead_lettered", "failed", `Retries exhausted (${this.pipe.maxRetries}) while ${why}; moved to dead-letter queue for redrive on recovery.`);
         return;
       }
       const backoff = Math.min(this.pipe.retryBaseMs * 2 ** (item.failures - 1), this.pipe.retryCapMs);
       svc.held++;
       svc.peakDepth = Math.max(svc.peakDepth, svc.depth);
       if (item.copy === 0) rec.retries++;
-      this.emit(item, to, "retry_scheduled", "queued", `${to} unavailable; retry ${item.failures}/${this.pipe.maxRetries} in ${fmt(backoff / 1000)}s (exponential backoff).`);
+      this.emit(item, to, "retry_scheduled", "queued", `${cut ? `Link into ${to} cut` : `${to} unavailable`}; retry ${item.failures}/${this.pipe.maxRetries} in ${fmt(backoff / 1000)}s (exponential backoff).`);
       this.after(backoff, () => {
         svc.held--;
         this.arrive(item, to);
@@ -523,6 +536,7 @@ export class Simulation {
       });
       return;
     }
+    svc.partitionFails = 0;
     if (svc.queue.length >= this.pipe.queueCapacity) {
       this.drop(item, to, "queue_overflow", `${to} inbound queue is full (${this.pipe.queueCapacity}); event dropped.`);
       return;
@@ -714,6 +728,24 @@ export class Simulation {
 
   // ---------------------------------------------------------------- faults, health, recovery
 
+  /** True while a partition fault cuts the link into `id`. The service itself keeps running and reports healthy. */
+  private partitioned(id: ServiceId): boolean {
+    return this.activeFaults.some((a) => a.fault.type === "network_partition" && a.fault.target === id);
+  }
+
+  /**
+   * Resilient senders cannot tell a cut link from a dead service, but they can notice the contradiction: deliveries into
+   * a service that still reports healthy keep failing. After two consecutive failures that is reported as a suspected partition.
+   */
+  private notePartitionFailure(svc: Service, item: Item) {
+    svc.partitionFails++;
+    if (svc.partitionFails < 2 || svc.partitionSuspected) return;
+    svc.partitionSuspected = true;
+    this.counters.partitionSuspected++;
+    this.trace(item, svc.id, "partition_suspected", `Deliveries into ${svc.id} keep failing although ${svc.id} reports ${svc.health}: suspected network partition on the link into it.`);
+    this.note("partition_suspected", `Suspected network partition: the link into ${svc.id} is failing while the service reports ${svc.health}.`, svc.id);
+  }
+
   private startFault(fault: FaultConfig) {
     const ord = this.faultOrd++;
     this.activeFaults.push({ ord, fault, rng: makeRng(this.config.seed, `fault:${ord}`) });
@@ -739,7 +771,24 @@ export class Simulation {
     const svc = this.services[a.fault.target];
     this.note("fault_ended", `${a.fault.type} fault on ${a.fault.target} ended.`, a.fault.target);
     if (a.fault.type === "outage") this.restore(svc, "automatic");
+    else if (a.fault.type === "network_partition") this.heal(svc);
     else this.refresh(svc);
+  }
+
+  /** The link into `svc` is back. Replay what was dead-lettered while it was cut; held retries succeed on their own timers. */
+  private heal(svc: Service) {
+    if (this.partitioned(svc.id)) return;
+    svc.partitionFails = 0;
+    svc.partitionSuspected = false;
+    const redrive = svc.dlq.splice(0);
+    this.note("partition_healed", `Link into ${svc.id} restored; ${redrive.length} dead-lettered events redriven, ${svc.held} retries still pending.`, svc.id);
+    redrive.forEach((it) => {
+      it.failures = 0;
+      this.trace(it, svc.id, "redriven", `Dead-lettered event redriven to ${svc.id} after the partition healed.`);
+      this.arrive(it, svc.id);
+    });
+    this.refresh(svc);
+    this.kick(svc);
   }
 
   private restore(svc: Service, trigger: "automatic" | "manual") {
@@ -903,6 +952,8 @@ export function describeFault(f: FaultConfig): string {
       return `Packet loss fault: ${Math.round(f.intensity * 100)}% of events into ${f.target} dropped.`;
     case "out_of_order":
       return `Out-of-order fault: ${Math.round(f.intensity * 100)}% of events into ${f.target} held ${f.delaySec}s so newer readings overtake them.`;
+    case "network_partition":
+      return `Network partition: the link into ${f.target} is cut${f.durationSec ? ` for ${f.durationSec}s` : ""}. ${f.target} keeps running and reports healthy, but nothing can reach it.`;
     case "clock_skew":
       return `Clock-skew fault: ${Math.round(f.intensity * 100)}% of readings into ${f.target} are stamped ${f.delaySec}s ahead of when they were taken.`;
     case "outage":

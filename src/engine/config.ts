@@ -8,7 +8,7 @@ export const ENGINE_VERSION = "1";
 export const MAX_FAULTS = 12;
 
 export const faultSchema = z.object({
-  type: z.enum(["latency", "duplicate", "outage", "packet_loss", "out_of_order", "clock_skew"]),
+  type: z.enum(["latency", "duplicate", "outage", "packet_loss", "out_of_order", "clock_skew", "network_partition"]),
   target: z.enum(SERVICE_IDS),
   startSec: z.number().min(0, "Fault start must be 0 or later."),
   durationSec: z.number().positive("Fault duration must be greater than 0.").nullable(),
@@ -81,6 +81,16 @@ export function validateFault(f: FaultConfig, c: Pick<ExperimentConfig, "duratio
       path: `${path}.durationSec`,
       message: `The outage would end at ${round(f.startSec + f.durationSec)}s, after the ${c.durationSec}s window. Recovery could not be observed; shorten the outage or extend the window.`,
     });
+  }
+  if (f.type === "network_partition") {
+    if (f.durationSec === null) {
+      issues.push({ path: `${path}.durationSec`, message: "A network partition needs a duration: it heals on its own, so there is no manual recovery." });
+    } else if (f.startSec + f.durationSec > c.durationSec) {
+      issues.push({
+        path: `${path}.durationSec`,
+        message: `The partition would heal at ${round(f.startSec + f.durationSec)}s, after the ${c.durationSec}s window. Healing could not be observed; shorten the partition or extend the window.`,
+      });
+    }
   }
   if (f.type === "latency" && f.delaySec <= 0) {
     issues.push({ path: `${path}.delaySec`, message: "Latency faults need a delay greater than 0 seconds." });
