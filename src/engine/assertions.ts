@@ -31,6 +31,8 @@ export const ASSERTION_KINDS = [
   "no_stale_overwrite",
   "reordering_observed",
   "event_time_preserved",
+  "clock_skew_observed",
+  "future_data_flagged",
 ] as const;
 export type AssertionKind = (typeof ASSERTION_KINDS)[number];
 
@@ -297,6 +299,16 @@ const checks: Record<AssertionKind, (c: Ctx) => Verdict> = {
   reordering_observed({ m, r }) {
     if (!faultsOf(r, "out_of_order").length) return na();
     return verdict(m.reorderedReadings > 0, "older readings are processed after newer readings from the same device", `${m.reorderedReadings} readings arrived out of order`);
+  },
+  clock_skew_observed({ r }) {
+    if (!faultsOf(r, "clock_skew").length) return na();
+    const injected = r.log.filter((l) => l.type === "clock_skew_injected").map((l) => l.eventId);
+    return verdict(r.counters.clockSkewInjected > 0, "the fault shifts reading timestamps ahead of the true time", `${r.counters.clockSkewInjected} readings stamped ahead of their true time`, [...new Set(injected)]);
+  },
+  future_data_flagged({ r }) {
+    if (!faultsOf(r, "clock_skew").length || r.counters.clockSkewInjected === 0) return na();
+    const unflagged = r.log.filter((l) => l.type === "future_dated_delivered").map((l) => l.eventId);
+    return verdict(r.counters.futureDatedDelivered === 0, "no future-dated reading reaches clinicians without being flagged and corrected", `${r.counters.clockSkewFlagged} flagged and corrected, ${r.counters.futureDatedDelivered} delivered future-dated`, [...new Set(unflagged)]);
   },
   event_time_preserved({ r }) {
     if (!faultsOf(r, "out_of_order").length) return na();

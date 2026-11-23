@@ -37,7 +37,7 @@ export const MEASUREMENT_UNITS: Record<Measurement, string> = {
   systolic_bp: "mmHg",
 };
 
-export type FaultType = "latency" | "duplicate" | "outage" | "packet_loss" | "out_of_order";
+export type FaultType = "latency" | "duplicate" | "outage" | "packet_loss" | "out_of_order" | "clock_skew";
 export type ResilienceMode = "resilient" | "faulty";
 
 export interface FaultConfig {
@@ -47,9 +47,9 @@ export interface FaultConfig {
   startSec: number;
   /** Duration in virtual seconds; null = until manually recovered (outage) or end of run. */
   durationSec: number | null;
-  /** Fraction 0..1 of eligible events affected (duplicate, packet_loss, out_of_order). Ignored for latency/outage. */
+  /** Fraction 0..1 of eligible events affected (duplicate, packet_loss, out_of_order, clock_skew). Ignored for latency/outage. */
   intensity: number;
-  /** Seconds of added delay (latency) or hold time (out_of_order). */
+  /** Seconds of added delay (latency), hold time (out_of_order) or how far the device clock runs ahead (clock_skew). */
   delaySec: number;
 }
 
@@ -138,6 +138,10 @@ export interface EventRecord {
   lateArrival: boolean;
   staleOverwrite: boolean;
   staleFlagged: boolean;
+  /** Timestamp the device put on the reading. Equals eventTime unless a clock-skew fault shifted it. */
+  reportedTime: number;
+  /** Resilient mode noticed the reported time was in the future and corrected it for clinicians. */
+  clockSkewFlagged: boolean;
   deadLettered: boolean;
   retries: number;
   delayedBySec: number;
@@ -234,5 +238,8 @@ export interface SimulationResult {
     staleOverwrites: number;
     lateArrivals: number;
     staleFlagged: number;
+    clockSkewInjected: number;
+    clockSkewFlagged: number;
+    futureDatedDelivered: number;
   };
 }

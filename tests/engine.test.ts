@@ -100,6 +100,30 @@ describe("faults", () => {
     const bad = run(cfg({ mode: "faulty" }, f));
     expect(bad.gaps.detectedBySequence).toEqual([]);
   });
+  it("clock skew: resilient corrects future-dated readings and keeps every alert; faulty shows them unflagged", () => {
+    const f = [makeFault({ type: "clock_skew", target: "ingestion", startSec: 0, durationSec: 100, intensity: 0.4, delaySec: 30 })];
+    const good = run(cfg({ mode: "resilient" }, f));
+    const bad = run(cfg({ mode: "faulty" }, f));
+    expect(good.counters.clockSkewInjected).toBeGreaterThan(0);
+    expect(good.counters.clockSkewFlagged).toBe(good.counters.clockSkewInjected);
+    expect(good.counters.futureDatedDelivered).toBe(0);
+    for (const e of good.events.filter((x) => x.clockSkewFlagged)) {
+      expect(e.reportedTime).toBeGreaterThanOrEqual(e.eventTime);
+      expect(e.reportedTime).toBeLessThan(e.eventTime + 30);
+    }
+    const m = computeMetrics(good);
+    expect(m.alertsDelivered).toBe(m.alertsExpected);
+    expect(bad.counters.clockSkewInjected).toBeGreaterThan(0);
+    expect(bad.counters.clockSkewFlagged).toBe(0);
+    expect(bad.counters.futureDatedDelivered).toBeGreaterThan(0);
+    for (const e of bad.events.filter((x) => x.reportedTime > x.eventTime)) expect(e.reportedTime).toBeCloseTo(e.eventTime + 30, 5);
+  });
+  it("clock skew inside the tolerance is not flagged", () => {
+    const f = [makeFault({ type: "clock_skew", target: "ingestion", startSec: 0, durationSec: 100, intensity: 0.4, delaySec: 3 })];
+    const good = run(cfg({ mode: "resilient" }, f));
+    expect(good.counters.clockSkewInjected).toBeGreaterThan(0);
+    expect(good.counters.clockSkewFlagged).toBe(0);
+  });
   it("out-of-order: resilient keeps event time and never overwrites newer data; faulty overwrites", () => {
     const f = [makeFault({ type: "out_of_order", target: "ingestion", startSec: 0, durationSec: 100, intensity: 0.4, delaySec: 8 })];
     const good = run(cfg({ mode: "resilient" }, f));

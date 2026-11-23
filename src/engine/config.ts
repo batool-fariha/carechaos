@@ -8,7 +8,7 @@ export const ENGINE_VERSION = "1";
 export const MAX_FAULTS = 12;
 
 export const faultSchema = z.object({
-  type: z.enum(["latency", "duplicate", "outage", "packet_loss", "out_of_order"]),
+  type: z.enum(["latency", "duplicate", "outage", "packet_loss", "out_of_order", "clock_skew"]),
   target: z.enum(SERVICE_IDS),
   startSec: z.number().min(0, "Fault start must be 0 or later."),
   durationSec: z.number().positive("Fault duration must be greater than 0.").nullable(),
@@ -88,7 +88,10 @@ export function validateFault(f: FaultConfig, c: Pick<ExperimentConfig, "duratio
   if (f.type === "out_of_order" && f.delaySec <= 0) {
     issues.push({ path: `${path}.delaySec`, message: "Out-of-order faults need a hold time greater than 0 seconds so newer readings can overtake held ones." });
   }
-  if ((f.type === "packet_loss" || f.type === "duplicate" || f.type === "out_of_order") && f.intensity <= 0) {
+  if (f.type === "clock_skew" && f.delaySec <= 0) {
+    issues.push({ path: `${path}.delaySec`, message: "Clock-skew faults need a skew greater than 0 seconds (how far the device clock runs ahead)." });
+  }
+  if ((f.type === "packet_loss" || f.type === "duplicate" || f.type === "out_of_order" || f.type === "clock_skew") && f.intensity <= 0) {
     issues.push({ path: `${path}.intensity`, message: "Intensity must be greater than 0 for this fault type (otherwise nothing is affected)." });
   }
   return issues;

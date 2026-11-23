@@ -9,6 +9,7 @@
 | Service outage | Target unavailable; manual or automatic recovery | `durationSec` or `null` (until recovered) |
 | Packet loss | Drops a fraction of events entering the target | `intensity` (5/10/25 %) |
 | Out-of-order | Holds a fraction of events so newer ones overtake | `intensity`, `delaySec` (hold) |
+| Clock skew | Stamps a fraction of readings `delaySec` seconds ahead of when they were taken (a device with a fast clock) | `intensity`, `delaySec` (skew) |
 | Recovery backlog | Outage + low `drainCapacityPerSec` | scenario “Recovery backlog” |
 
 The Device Simulator supports outages only.
@@ -30,6 +31,7 @@ The Device Simulator supports outages only.
 | packet-loss | 10 % loss at ingestion | yes | gap detection |
 | recovery-backlog | processor down 60 s @ 2 evt/s, drain 3/s | yes | backlog, post-recovery processing, unexpected loss |
 | out-of-order | 25 % held 8 s | yes | no stale overwrite |
+| clock-skew | 30 % of readings stamped 30 s ahead | yes | no future-dated reading reaches clinicians unflagged |
 
 These expectations are enforced by `tests/integration.test.ts`.
 

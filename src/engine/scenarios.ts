@@ -153,6 +153,24 @@ export const SCENARIOS: Scenario[] = [
       ...COMMON,
     ],
   },
+  {
+    id: "clock-skew",
+    name: "Device clock skew",
+    description: "30% of readings carry a timestamp 30s ahead of when they were taken.",
+    hypothesis: "If a device clock runs ahead, the pipeline notices readings stamped in the future, keeps them (the values still matter), replaces the timestamp with the arrival time and flags it, so no future-dated alert reaches clinicians unflagged.",
+    initialConditions: "Baseline traffic. Clock skew into the Ingestion API at 30% intensity with a 30s skew, from t=20s to t=140s. Tolerance for a device clock ahead of arrival time: 5s.",
+    expectedBehavior: "Skewed readings are detected on arrival and corrected, nothing is dropped, and every expected alert is still delivered.",
+    relevantMetrics: ["Delivery rate", "Stale flagged", "Event-to-delivery latency"],
+    faults: [makeFault({ type: "clock_skew", target: "ingestion", startSec: 20, durationSec: 120, intensity: 0.3, delaySec: 30 })],
+    overrides: {},
+    assertions: [
+      a("skewed", "clock_skew_observed", "The fault shifts reading timestamps ahead of the true time"),
+      a("flagged", "future_data_flagged", "No future-dated reading reaches clinicians without being flagged and corrected"),
+      a("all-processed", "all_processed", "All readings are processed"),
+      a("all-delivered", "all_alerts_delivered", "All expected alerts are delivered"),
+      ...COMMON,
+    ],
+  },
 ];
 
 export const DEMO_SCENARIO_ID = "alert-service-outage";
@@ -202,6 +220,10 @@ const FAULT_ASSERTIONS: Record<FaultType, AssertionSpec[]> = {
     a("g-reorder", "reordering_observed", "Reordering is observed in processing order"),
     a("g-time", "event_time_preserved", "Event time is preserved and distinct from processing time"),
     a("g-overwrite", "no_stale_overwrite", "No newer measurement is overwritten by an older one"),
+  ],
+  clock_skew: [
+    a("g-skewed", "clock_skew_observed", "The fault shifts reading timestamps ahead of the true time"),
+    a("g-flagged", "future_data_flagged", "No future-dated reading reaches clinicians without being flagged and corrected"),
   ],
 };
 

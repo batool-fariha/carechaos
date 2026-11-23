@@ -47,6 +47,8 @@ const BREACH_RANGE: Record<Measurement, [number, number]> = {
 const BREACH_PROBABILITY = 0.15;
 
 const DUPLICATE_DELAY_MS = 1000;
+/** Resilient mode accepts device clocks this far ahead of arrival time before treating a timestamp as wrong. */
+const CLOCK_TOLERANCE_SEC = 5;
 const SAMPLE_MS = 1000;
 
 export const NEXT_HOP: Partial<Record<ServiceId, ServiceId>> = {
@@ -211,6 +213,9 @@ export class Simulation {
       staleOverwrites: 0,
       lateArrivals: 0,
       staleFlagged: 0,
+      clockSkewInjected: 0,
+      clockSkewFlagged: 0,
+      futureDatedDelivered: 0,
     };
     this.gapTracker = new Map();
     this.reconGaps = [];
@@ -368,6 +373,8 @@ export class Simulation {
       lateArrival: false,
       staleOverwrite: false,
       staleFlagged: false,
+      reportedTime: this.nowSec,
+      clockSkewFlagged: false,
       deadLettered: false,
       retries: 0,
       delayedBySec: 0,
@@ -430,6 +437,13 @@ export class Simulation {
           }
         } else if (f.type === "duplicate") {
           if (a.rng() < f.intensity) duplicate = true;
+        } else if (f.type === "clock_skew") {
+          if (a.rng() < f.intensity && rec.reportedTime === rec.eventTime) {
+            rec.reportedTime = rec.eventTime + f.delaySec;
+            this.counters.clockSkewInjected++;
+            this.tag(rec, `clock_skew@${to}`);
+            this.trace(item, from, "clock_skew_injected", `Device clock runs ${fmt(f.delaySec)}s ahead: ${rec.eventId} is stamped ${fmt(rec.reportedTime)}s although it was taken at ${fmt(rec.eventTime)}s.`);
+          }
         }
       }
     }
@@ -568,6 +582,7 @@ export class Simulation {
       case "ingestion":
         svc.processed++;
         if (resilient && item.copy === 0) this.trackSequence(rec);
+        if (resilient && item.copy === 0 && rec.reportedTime - this.nowSec > CLOCK_TOLERANCE_SEC) this.flagClockSkew(item, rec);
         return this.send(item, "ingestion", "processor");
       case "processor": {
         svc.processed++;
@@ -610,11 +625,28 @@ export class Simulation {
           this.trace(item, "dashboard", "duplicate_alert_delivered", `Faulty mode: duplicate alert for ${rec.eventId} shown to clinician again.`);
         }
         const age = this.nowSec - rec.eventTime;
+        if (first && rec.reportedTime - this.nowSec > CLOCK_TOLERANCE_SEC) {
+          this.counters.futureDatedDelivered++;
+          this.trace(item, "dashboard", "future_dated_delivered", `Faulty mode: alert for ${rec.eventId} reaches clinicians stamped ${fmt(rec.reportedTime)}s, ${fmt(rec.reportedTime - this.nowSec)}s in the future, with no warning.`);
+        }
         if (resilient && first && age > this.config.staleThresholdSec) this.flagStale(item, rec, "dashboard", age);
         this.emit(item, "dashboard", "delivered", "delivered", `Alert delivered to clinician dashboard (event-to-delivery latency ${fmt(age)}s${rec.staleFlagged ? ", flagged stale" : ""}).`);
         return;
       }
     }
+  }
+
+  /**
+   * Resilient ingestion: a reading stamped more than the tolerance ahead of its arrival comes from a wrong device clock.
+   * Keep the reading and its alert (the value still matters), but replace the timestamp with the arrival time and flag it.
+   */
+  private flagClockSkew(item: Item, rec: EventRecord) {
+    if (rec.clockSkewFlagged) return;
+    const ahead = rec.reportedTime - this.nowSec;
+    rec.clockSkewFlagged = true;
+    rec.reportedTime = this.nowSec;
+    this.counters.clockSkewFlagged++;
+    this.trace(item, "ingestion", "clock_skew_corrected", `Timestamp ${fmt(ahead)}s in the future (tolerance ${CLOCK_TOLERANCE_SEC}s): device clock judged wrong. Reading kept, timestamp replaced with arrival time and flagged for clinicians.`);
   }
 
   private flagStale(item: Item, rec: EventRecord, where: ServiceId, age: number) {
@@ -871,6 +903,8 @@ export function describeFault(f: FaultConfig): string {
       return `Packet loss fault: ${Math.round(f.intensity * 100)}% of events into ${f.target} dropped.`;
     case "out_of_order":
       return `Out-of-order fault: ${Math.round(f.intensity * 100)}% of events into ${f.target} held ${f.delaySec}s so newer readings overtake them.`;
+    case "clock_skew":
+      return `Clock-skew fault: ${Math.round(f.intensity * 100)}% of readings into ${f.target} are stamped ${f.delaySec}s ahead of when they were taken.`;
     case "outage":
       return `Outage fault: ${f.target} unavailable${f.durationSec ? ` for ${f.durationSec}s` : " until manually recovered"}.`;
   }
