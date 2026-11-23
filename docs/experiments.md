@@ -10,6 +10,7 @@
 | Packet loss | Drops a fraction of events entering the target | `intensity` (5/10/25 %) |
 | Out-of-order | Holds a fraction of events so newer ones overtake | `intensity`, `delaySec` (hold) |
 | Clock skew | Stamps a fraction of readings `delaySec` seconds ahead of when they were taken (a device with a fast clock) | `intensity`, `delaySec` (skew) |
+| Network partition | Cuts the link into the target for `durationSec`. The target keeps running and reports healthy, but nothing reaches it | `durationSec` (required; heals on its own) |
 | Recovery backlog | Outage + low `drainCapacityPerSec` | scenario “Recovery backlog” |
 
 The Device Simulator supports outages only.
@@ -32,6 +33,7 @@ The Device Simulator supports outages only.
 | recovery-backlog | processor down 60 s @ 2 evt/s, drain 3/s | yes | backlog, post-recovery processing, unexpected loss |
 | out-of-order | 25 % held 8 s | yes | no stale overwrite |
 | clock-skew | 30 % of readings stamped 30 s ahead | yes | no future-dated reading reaches clinicians unflagged |
+| network-partition | link into the processor cut for 60 s | yes | suspected partition reported, events held not dropped, completed after heal, unexpected loss |
 
 These expectations are enforced by `tests/integration.test.ts`.
 

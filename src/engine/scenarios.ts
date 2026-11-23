@@ -171,6 +171,24 @@ export const SCENARIOS: Scenario[] = [
       ...COMMON,
     ],
   },
+  {
+    id: "network-partition",
+    name: "Network partition",
+    description: "The link into the Readings Processor is cut for 60s. Every service still reports healthy.",
+    hypothesis: "If the link into a service is cut while the service keeps running, the pipeline notices that deliveries keep failing although the target reports healthy, holds the events instead of dropping them, and completes them after the link heals.",
+    initialConditions: "Baseline traffic. Network partition on the link into the Readings Processor from t=40s to t=100s. Both services stay healthy throughout; only the link between them is cut.",
+    expectedBehavior: "A suspected partition is reported, events are held or dead-lettered rather than silently dropped, and everything generated during the cut is processed after the link heals.",
+    relevantMetrics: ["Events held", "Dead-lettered events", "Processing success rate"],
+    faults: [makeFault({ type: "network_partition", target: "processor", startSec: 40, durationSec: 60 })],
+    overrides: {},
+    assertions: [
+      a("detected", "partition_detected", "The cut link is reported as a suspected partition although both services report healthy"),
+      a("held", "held_during_partition", "Events that cannot cross the cut link are held or dead-lettered, not dropped"),
+      a("healed", "processed_after_heal", "Events generated during the partition complete after it heals"),
+      a("all-processed", "all_processed", "All readings are processed"),
+      ...COMMON,
+    ],
+  },
 ];
 
 export const DEMO_SCENARIO_ID = "alert-service-outage";
@@ -220,6 +238,11 @@ const FAULT_ASSERTIONS: Record<FaultType, AssertionSpec[]> = {
     a("g-reorder", "reordering_observed", "Reordering is observed in processing order"),
     a("g-time", "event_time_preserved", "Event time is preserved and distinct from processing time"),
     a("g-overwrite", "no_stale_overwrite", "No newer measurement is overwritten by an older one"),
+  ],
+  network_partition: [
+    a("g-detected", "partition_detected", "The cut link is reported as a suspected partition although both services report healthy"),
+    a("g-held", "held_during_partition", "Events that cannot cross the cut link are held or dead-lettered, not dropped"),
+    a("g-heal", "processed_after_heal", "Events generated during the partition complete after it heals"),
   ],
   clock_skew: [
     a("g-skewed", "clock_skew_observed", "The fault shifts reading timestamps ahead of the true time"),

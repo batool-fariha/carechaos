@@ -10,6 +10,7 @@ export const FAULT_LABELS: Record<FaultType, string> = {
   packet_loss: "Packet loss",
   out_of_order: "Out-of-order delivery",
   clock_skew: "Device clock skew",
+  network_partition: "Network partition",
 };
 
 export const FAULT_HELP: Record<FaultType, string> = {
@@ -18,6 +19,7 @@ export const FAULT_HELP: Record<FaultType, string> = {
   outage: "Makes the target service unavailable. Resilient senders retry with backoff; faulty senders drop events. Recovery is only reported once the backlog drains.",
   packet_loss: "Drops a fraction of events before they reach the target service. Every drop is recorded with a reason.",
   out_of_order: "Holds a fraction of events for the hold time so newer readings overtake them. Event time is preserved.",
+  network_partition: "Cuts the link into the target service for the duration. The service keeps running and reports healthy, but nothing can reach it. Resilient senders retry, notice the contradiction and dead-letter; faulty senders drop events. The partition heals on its own.",
   clock_skew: "Stamps a fraction of readings with a time that many seconds ahead of when they were taken, as a device with a wrong clock would. Resilient ingestion keeps the reading, replaces the timestamp with the arrival time and flags it.",
 };
 

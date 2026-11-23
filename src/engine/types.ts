@@ -37,7 +37,7 @@ export const MEASUREMENT_UNITS: Record<Measurement, string> = {
   systolic_bp: "mmHg",
 };
 
-export type FaultType = "latency" | "duplicate" | "outage" | "packet_loss" | "out_of_order" | "clock_skew";
+export type FaultType = "latency" | "duplicate" | "outage" | "packet_loss" | "out_of_order" | "clock_skew" | "network_partition";
 export type ResilienceMode = "resilient" | "faulty";
 
 export interface FaultConfig {
@@ -172,7 +172,9 @@ export interface TimelineEntry {
     | "recovery_initiated"
     | "recovery_completed"
     | "intervention"
-    | "gap_detected";
+    | "gap_detected"
+    | "partition_suspected"
+    | "partition_healed";
   service?: ServiceId;
   detail: string;
 }
@@ -241,5 +243,7 @@ export interface SimulationResult {
     clockSkewInjected: number;
     clockSkewFlagged: number;
     futureDatedDelivered: number;
+    partitionDropped: number;
+    partitionSuspected: number;
   };
 }

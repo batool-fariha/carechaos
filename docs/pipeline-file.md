@@ -51,6 +51,7 @@ A file may also be `{ "experiments": [ {...}, {...} ] }`.
 | `packet_loss` | `intensity` 0-1 | Drops that fraction |
 | `out_of_order` | `intensity`, `delaySec` (hold) | Holds events so newer ones overtake |
 | `clock_skew` | `intensity`, `delaySec` (skew) | Stamps that fraction of readings `delaySec` seconds ahead of when they were taken. Resilient ingestion accepts up to 5 s of drift; beyond that it keeps the reading, replaces the timestamp with the arrival time and flags it |
+| `network_partition` | `durationSec` (required) | Cuts the link into `target`; the target stays healthy. Resilient senders retry, flag a suspected partition after two failed deliveries and dead-letter; faulty senders drop with reason `network_partition`. Heals when the duration ends and replays the dead-letter queue |
 | `outage` | `durationSec` (`null` = until manual recovery) | Target unavailable |
 
 The `device` stage supports `outage` only.

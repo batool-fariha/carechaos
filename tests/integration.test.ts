@@ -30,6 +30,7 @@ describe("scenario library", () => {
     "recovery-backlog": ["backlog", "after-recovery", "no-unexpected-loss"],
     "out-of-order": ["no-overwrite"],
     "clock-skew": ["flagged"],
+    "network-partition": ["detected", "held", "healed", "all-processed", "no-unexpected-loss"],
     "game-day": ["g-processed", "g-dup", "g-dup-alerts", "g-stale", "g-queue", "g-after", "g-gaps", "no-unexpected-loss"],
   };
   for (const [id, ids] of Object.entries(expectedFaultyFailures)) {

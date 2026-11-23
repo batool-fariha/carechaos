@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeMetrics, latencyStats, quantile, ratio, Simulation, validateConfig, scenarioConfig, evaluateAssertions, evaluate } from "@/engine";
+import { computeMetrics, latencyStats, quantile, ratio, Simulation, validateConfig, validateFault, scenarioConfig, evaluateAssertions, evaluate } from "@/engine";
 import { makeRng } from "@/engine/prng";
 import { cfg, makeFault, run } from "./helpers";
 
@@ -99,6 +99,37 @@ describe("faults", () => {
     expect(r.gaps.detectedBySequence.length).toBeGreaterThan(0);
     const bad = run(cfg({ mode: "faulty" }, f));
     expect(bad.gaps.detectedBySequence).toEqual([]);
+  });
+  it("network partition: resilient holds, flags and replays; faulty drops silently; the target never reports unavailable", () => {
+    const f = [makeFault({ type: "network_partition", target: "processor", startSec: 20, durationSec: 40 })];
+    const good = run(cfg({ mode: "resilient" }, f));
+    const bad = run(cfg({ mode: "faulty" }, f));
+    for (const r of [good, bad]) {
+      expect(r.services.processor.transitions.some((t) => t.to === "unavailable")).toBe(false);
+    }
+    expect(good.counters.partitionSuspected).toBe(1);
+    expect(good.counters.partitionDropped).toBe(0);
+    const during = good.events.filter((e) => e.eventTime >= 20 && e.eventTime < 60);
+    expect(during.length).toBeGreaterThan(0);
+    expect(during.every((e) => e.processedAt !== null && e.processedAt >= 60)).toBe(true);
+    expect(good.events.every((e) => e.processedAt !== null)).toBe(true);
+    expect(bad.counters.partitionSuspected).toBe(0);
+    expect(bad.counters.partitionDropped).toBeGreaterThan(0);
+    expect(bad.events.filter((e) => e.lossReason === "network_partition").length).toBe(bad.counters.partitionDropped);
+  });
+  it("network partition on a later link only holds the alerts, not the readings", () => {
+    const f = [makeFault({ type: "network_partition", target: "delivery", startSec: 20, durationSec: 40 })];
+    const good = run(cfg({ mode: "resilient" }, f));
+    expect(good.events.every((e) => e.processedAt !== null)).toBe(true);
+    const alerts = good.events.filter((e) => e.expectedAlert && e.eventTime >= 20 && e.eventTime < 60);
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(alerts.every((e) => e.deliveredAt !== null && e.deliveredAt >= 60)).toBe(true);
+  });
+  it("network partition needs a finite duration that ends inside the window", () => {
+    const base = { type: "network_partition" as const, target: "processor" as const, startSec: 20 };
+    expect(validateFault(makeFault({ ...base, durationSec: null }), { durationSec: 200 }).length).toBeGreaterThan(0);
+    expect(validateFault(makeFault({ ...base, durationSec: 500 }), { durationSec: 200 }).length).toBeGreaterThan(0);
+    expect(validateFault(makeFault({ ...base, durationSec: 60 }), { durationSec: 200 })).toEqual([]);
   });
   it("clock skew: resilient corrects future-dated readings and keeps every alert; faulty shows them unflagged", () => {
     const f = [makeFault({ type: "clock_skew", target: "ingestion", startSec: 0, durationSec: 100, intensity: 0.4, delaySec: 30 })];
