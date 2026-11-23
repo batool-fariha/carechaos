@@ -1,0 +1,28 @@
+{
+  "name": "Ward Wi-Fi partition with drifted bedside clocks",
+  "seed": 20260311,
+  "eventCount": 240,
+  "intervalSec": 1,
+  "durationSec": 320,
+  "mode": "resilient",
+  "pipeline": {
+    "capacities": { "processor": 12, "delivery": 6 },
+    "queueCapacity": 500,
+    "retry": { "maxRetries": 6, "baseSec": 1, "capSec": 8 },
+    "deadLetterRedrive": true,
+    "alertRules": { "heart_rate": { "op": ">", "threshold": 130 } }
+  },
+  "faults": [
+    { "type": "clock_skew", "target": "ingestion", "startSec": 20, "durationSec": 180, "intensity": 0.2, "delaySec": 45 },
+    { "type": "network_partition", "target": "processor", "startSec": 90, "durationSec": 50, "intensity": 1, "delaySec": 0 }
+  ],
+  "assertions": [
+    { "kind": "clock_skew_observed", "title": "Some bedside monitors stamp readings ahead of the true time" },
+    { "kind": "future_data_flagged", "title": "No future-dated reading reaches clinicians without being flagged and corrected" },
+    { "kind": "partition_detected", "title": "The cut ward link is reported as a suspected partition although both services report healthy" },
+    { "kind": "held_during_partition", "title": "Readings that cannot cross the cut link are held for retry or dead-lettered, not dropped" },
+    { "kind": "processed_after_heal", "title": "Readings taken during the partition are processed once the link heals" },
+    { "kind": "all_alerts_delivered", "title": "Every expected alert is eventually delivered" },
+    { "kind": "no_unexpected_loss", "title": "Nothing is lost for any reason other than the injected faults" }
+  ]
+}

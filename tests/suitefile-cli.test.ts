@@ -1,9 +1,29 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCENARIOS, configToFile, parseSuiteFile, runExperiment, toJUnit, validateConfig } from "@/engine";
+
+describe("bundled examples", () => {
+  const files = readdirSync("examples").filter((f) => f.endsWith(".json"));
+  for (const f of files) {
+    it(`${f} parses, and every experiment in it passes in resilient mode`, () => {
+      const parsed = parseSuiteFile(JSON.parse(readFileSync(path.join("examples", f), "utf8")));
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) return;
+      for (const e of parsed.experiments) expect(runExperiment({ ...e.config, mode: "resilient" }).verdict).toBe("passed");
+    });
+  }
+  it("the ward Wi-Fi example fails in faulty mode, so it actually discriminates", () => {
+    const parsed = parseSuiteFile(JSON.parse(readFileSync("examples/ward-wifi-partition-and-clock-drift.json", "utf8")));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const bad = runExperiment({ ...parsed.experiments[0].config, mode: "faulty" });
+    expect(bad.verdict).toBe("failed");
+    expect(bad.assertions.filter((a) => a.status === "failed").length).toBeGreaterThanOrEqual(5);
+  });
+});
 
 describe("experiment files", () => {
   it("resolves a scenario preset plus overrides into a valid config", () => {

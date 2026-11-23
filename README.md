@@ -145,6 +145,8 @@ npm run carechaos -- validate examples/regional-endpoint-outage.json
 npm run carechaos -- run examples/regional-endpoint-outage.json
 ```
 
+[`examples/ward-wifi-partition-and-clock-drift.json`](examples/ward-wifi-partition-and-clock-drift.json) combines two faults, a cut ward network link and bedside monitors whose clocks run ahead. It passes in resilient mode, and `--mode faulty` shows what silently goes wrong: events dropped on the cut link, future-dated alerts shown to clinicians, and nothing reporting a problem.
+
 In GitHub Actions:
 
 ```yaml
