@@ -152,12 +152,13 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
       <Card title="Comparison: healthy baseline vs this run vs other resilience mode">
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="comparison">
+            <caption className="sr-only">Comparison of key metrics: healthy baseline, this run, and the other resilience mode</caption>
             <thead className="text-left text-xs text-mute">
               <tr>
-                <th className="py-2 pr-4 font-medium">Metric</th>
-                <th className="pr-4 font-medium">Healthy baseline ({config.mode}, no faults)</th>
-                <th className="pr-4 font-medium">This run ({config.mode})</th>
-                <th className="font-medium">Same config, {other.toLowerCase()} mode</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Metric</th>
+                <th scope="col" className="pr-4 font-medium">Healthy baseline ({config.mode}, no faults)</th>
+                <th scope="col" className="pr-4 font-medium">This run ({config.mode})</th>
+                <th scope="col" className="font-medium">Same config, {other.toLowerCase()} mode</th>
               </tr>
             </thead>
             <tbody>
@@ -203,6 +204,7 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Event counts by outcome">
           <table className="w-full text-sm">
+            <caption className="sr-only">Event counts by outcome</caption>
             <tbody>
               {Object.entries(m.outcomes).map(([k, v]) => (
                 <tr key={k} className="border-t border-line first:border-0">
@@ -227,7 +229,8 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
         <Card title="Recovery">
           {m.recoveries.length === 0 ? <Empty>No outage recovery occurred in this run.</Empty> : (
             <table className="w-full text-sm" data-testid="recovery-table">
-              <thead className="text-left text-xs text-mute"><tr><th className="py-1 font-medium">Service</th><th className="font-medium">Restored</th><th className="font-medium">Healthy</th><th className="font-medium">Duration</th></tr></thead>
+              <caption className="sr-only">Service recoveries after outages</caption>
+              <thead className="text-left text-xs text-mute"><tr><th scope="col" className="py-1 font-medium">Service</th><th scope="col" className="font-medium">Restored</th><th scope="col" className="font-medium">Healthy</th><th scope="col" className="font-medium">Duration</th></tr></thead>
               <tbody>
                 {m.recoveries.map((x, i) => (
                   <tr key={i} className="border-t border-line">
@@ -286,7 +289,8 @@ export function ResultsView({ id, config, createdAt, onRunLive }: Props) {
         <p className="mb-2 text-xs text-mute">{filtered.length} matching events (showing first 40). Select an ID to trace it through the pipeline.</p>
         <div className="max-h-72 overflow-auto">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-panel text-left text-mute"><tr><th className="py-1 font-medium">Event</th><th className="font-medium">Reading</th><th className="font-medium">Status</th><th className="font-medium">Reason / notes</th></tr></thead>
+            <caption className="sr-only">Event explorer: matching events with their reading, status and reason</caption>
+            <thead className="sticky top-0 bg-panel text-left text-mute"><tr><th scope="col" className="py-1 font-medium">Event</th><th scope="col" className="font-medium">Reading</th><th scope="col" className="font-medium">Status</th><th scope="col" className="font-medium">Reason / notes</th></tr></thead>
             <tbody>
               {filtered.slice(0, 40).map((e) => (
                 <tr key={e.eventId} className="border-t border-line/60">

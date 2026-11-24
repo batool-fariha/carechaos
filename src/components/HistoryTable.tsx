@@ -18,10 +18,11 @@ export function HistoryTable({ rows }: { rows: Omit<ExperimentRow, "owner">[] })
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full text-sm" data-testid="history-table">
+        <caption className="sr-only">Past experiments</caption>
         <thead className="bg-panel text-left text-xs text-mute">
           <tr>
             {["Experiment", "Scenario", "Mode", "Seed", "Status", "Assertions", "Delivery", "Created (UTC)", ""].map((h) => (
-              <th key={h} className="px-3 py-2.5 font-medium">{h}</th>
+              <th key={h} scope="col" className="px-3 py-2.5 font-medium">{h || <span className="sr-only">Actions</span>}</th>
             ))}
           </tr>
         </thead>
