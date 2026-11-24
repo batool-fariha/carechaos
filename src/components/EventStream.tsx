@@ -84,14 +84,15 @@ export function EventStream({ result, limit = 60, bare = false }: { result: Simu
       ) : (
         <div className="max-h-96 overflow-auto">
           <table className="w-full text-left text-xs" data-testid="event-stream">
+            <caption className="sr-only">Live event stream: every state change in the pipeline</caption>
             <thead className="sticky top-0 bg-panel text-mute">
               <tr>
-                <th className="py-1.5 pr-3 font-medium">Time</th>
-                <th className="pr-3 font-medium">Event ID</th>
-                <th className="pr-3 font-medium">Component</th>
-                <th className="pr-3 font-medium">Event type</th>
-                <th className="pr-3 font-medium">Status</th>
-                <th className="font-medium">Explanation</th>
+                <th scope="col" className="py-1.5 pr-3 font-medium">Time</th>
+                <th scope="col" className="pr-3 font-medium">Event ID</th>
+                <th scope="col" className="pr-3 font-medium">Component</th>
+                <th scope="col" className="pr-3 font-medium">Event type</th>
+                <th scope="col" className="pr-3 font-medium">Status</th>
+                <th scope="col" className="font-medium">Explanation</th>
               </tr>
             </thead>
             <tbody>
