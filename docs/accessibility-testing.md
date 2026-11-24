@@ -14,7 +14,7 @@ Write down the screen reader, browser and version when you report.
 
 These are likely problems. Please confirm or refute each while you test.
 
-- [ ] **Tables have no name and no column scope.** None of the tables (comparison, recovery, event stream, event list) has a `<caption>` or `scope="col"`. Check that the rotor/table list says what each table is, and that moving across a row announces the column header.
+- [ ] **Table names and column scope.** Every table now has a screen-reader-only `<caption>` and `scope="col"` on its header cells (they had neither before). Please confirm: the rotor or element list names each table sensibly, and moving across a row announces the column header. Check the "Event counts by outcome" table too, which has no header row, so each row is a status and a count.
 - [ ] **Pipeline topology** is an SVG group of buttons. Each button's label carries the service, its health and queue depth. Check that it reads sensibly, and whether a changing queue depth is announced (it should not be noisy).
 - [ ] **Run state** has `aria-live="polite"`. Check that "running", "paused" and "completed" are announced once each, not repeatedly.
 
