@@ -4,6 +4,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
 import { SERVICE_IDS, type Health, type ServiceId, type Sample, type SimulationResult } from "@/engine";
 import { HEALTH_META, SERVICE_SHORT } from "@/lib/format";
 import { Card, Empty } from "./ui";
+import { healthSummary, histogramSummary, latencySummary, outcomeSummary, queueSummary } from "@/lib/chart-summary";
 
 const axis = { stroke: "#6b7280", fontSize: 11 } as const;
 const tooltipStyle = { background: "#ffffff", border: "1px solid #dfe3e8", borderRadius: 6, fontSize: 12 };
@@ -14,14 +15,18 @@ function useMounted() {
   return m;
 }
 
-function ChartBox({ title, empty, children, caption }: { title: string; empty: boolean; children: React.ReactNode; caption?: string }) {
+function ChartBox({ title, empty, children, caption, summary }: { title: string; empty: boolean; children: React.ReactNode; caption?: string; summary?: string }) {
   const mounted = useMounted();
   return (
     <Card title={title}>
       {empty ? (
         <Empty>No data yet. Run an experiment to populate this chart from engine output.</Empty>
       ) : (
-        <div className="h-52 w-full">{mounted && <ResponsiveContainer width="100%" height="100%">{children as React.ReactElement}</ResponsiveContainer>}</div>
+        <>
+          {/* The chart itself is hidden from screen readers; the summary below says what it shows. */}
+          <div className="h-52 w-full" aria-hidden>{mounted && <ResponsiveContainer width="100%" height="100%">{children as React.ReactElement}</ResponsiveContainer>}</div>
+          {summary && <p className="sr-only">{summary}</p>}
+        </>
       )}
       {caption && <p className="mt-2 text-xs text-mute">{caption}</p>}
     </Card>
@@ -30,8 +35,8 @@ function ChartBox({ title, empty, children, caption }: { title: string; empty: b
 
 export function QueueChart({ samples }: { samples: Sample[] }) {
   return (
-    <ChartBox title="Queue depth over time" empty={samples.length < 2} caption="Events queued, held for retry, or dead-lettered, summed across services (virtual seconds).">
-      <AreaChart data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+    <ChartBox title="Queue depth over time" empty={samples.length < 2} summary={queueSummary(samples)} caption="Events queued, held for retry, or dead-lettered, summed across services (virtual seconds).">
+      <AreaChart accessibilityLayer={false} data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
         <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="t" {...axis} tickFormatter={(v) => `${Math.round(v)}s`} />
         <YAxis {...axis} allowDecimals={false} />
@@ -44,8 +49,8 @@ export function QueueChart({ samples }: { samples: Sample[] }) {
 
 export function LatencyChart({ samples }: { samples: Sample[] }) {
   return (
-    <ChartBox title="Latency over time" empty={samples.length < 2} caption="Mean event-time → processed-time latency of readings processed in each virtual second.">
-      <LineChart data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+    <ChartBox title="Latency over time" empty={samples.length < 2} summary={latencySummary(samples)} caption="Mean event-time → processed-time latency of readings processed in each virtual second.">
+      <LineChart accessibilityLayer={false} data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
         <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="t" {...axis} tickFormatter={(v) => `${Math.round(v)}s`} />
         <YAxis {...axis} unit="s" />
@@ -58,8 +63,8 @@ export function LatencyChart({ samples }: { samples: Sample[] }) {
 
 export function OutcomeChart({ samples }: { samples: Sample[] }) {
   return (
-    <ChartBox title="Successful vs failed events" empty={samples.length < 2} caption="Cumulative unique events. Failed = dropped or dead-lettered at the time of sampling.">
-      <LineChart data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+    <ChartBox title="Successful vs failed events" empty={samples.length < 2} summary={outcomeSummary(samples)} caption="Cumulative unique events. Failed = dropped or dead-lettered at the time of sampling.">
+      <LineChart accessibilityLayer={false} data={samples} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
         <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="t" {...axis} tickFormatter={(v) => `${Math.round(v)}s`} />
         <YAxis {...axis} allowDecimals={false} />
@@ -88,7 +93,7 @@ export function HealthStrip({ result }: { result: SimulationResult }) {
         <Empty>No data yet. Run an experiment to populate this chart from engine output.</Empty>
       ) : (
         <div>
-          <svg viewBox={`0 0 ${W + 90} ${SERVICE_IDS.length * (rowH + 4) + 18}`} className="w-full" role="img" aria-label="Service health over time">
+          <svg viewBox={`0 0 ${W + 90} ${SERVICE_IDS.length * (rowH + 4) + 18}`} className="w-full" aria-hidden>
             <defs>
               <pattern id="hs-deg" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <rect width="5" height="5" fill="#b45309" />
@@ -118,7 +123,12 @@ export function HealthStrip({ result }: { result: SimulationResult }) {
               {Math.round(samples[samples.length - 1].t)}s
             </text>
           </svg>
-          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-mute">
+          <ul className="sr-only" aria-label="Time each service spent unhealthy">
+            {healthSummary(samples).map((x) => (
+              <li key={x.id}>{x.text}</li>
+            ))}
+          </ul>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-mute" aria-hidden>
             {(["healthy", "degraded", "recovering", "unavailable"] as Health[]).map((h) => (
               <li key={h} className="flex items-center gap-1.5">
                 <svg width="14" height="14" aria-hidden>
@@ -141,8 +151,8 @@ function fillFor(h: Health): string {
 export function HistogramChart({ title, values, caption }: { title: string; values: number[]; caption?: string }) {
   const bins = histogram(values);
   return (
-    <ChartBox title={title} empty={values.length === 0} caption={caption}>
-      <BarChart data={bins} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+    <ChartBox title={title} empty={values.length === 0} summary={histogramSummary(values)} caption={caption}>
+      <BarChart accessibilityLayer={false} data={bins} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
         <CartesianGrid stroke="#dfe3e8" strokeDasharray="3 3" />
         <XAxis dataKey="label" {...axis} interval="preserveStartEnd" />
         <YAxis {...axis} allowDecimals={false} />

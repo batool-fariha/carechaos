@@ -132,13 +132,15 @@ export function Runner({ initialConfig, experimentId, startLabel = "Run demo", s
               </Pill>
               {verdict && (
                 <Pill tone={verdict === "passed" ? "teal" : verdict === "failed" ? "red" : "gray"} className="font-semibold">
-                  {verdict === "passed" ? "✓ Assertions passed" : verdict === "failed" ? "✕ Assertions failed" : "Inconclusive (stopped early)"}
+                  {verdict === "passed" ? <><span aria-hidden>✓</span> Assertions passed</> : verdict === "failed" ? <><span aria-hidden>✕</span> Assertions failed</> : "Inconclusive (stopped early)"}
                 </Pill>
               )}
-              <span className="tabnum font-mono text-sm text-mute" data-testid="clock">
-                t = {result.nowSec.toFixed(1)}s / {config.durationSec}s virtual
-              </span>
             </div>
+            {/* The clock ticks many times a second, so it sits outside the live region above;
+                otherwise screen readers would announce every tick. */}
+            <span className="tabnum mt-2 block font-mono text-sm text-mute" data-testid="clock">
+              t = {result.nowSec.toFixed(1)}s / {config.durationSec}s virtual
+            </span>
             <h2 className="mt-3 text-xl font-semibold" data-testid="story-headline">{story.headline}</h2>
             <p className="mt-1 max-w-3xl text-[15px] leading-relaxed text-ink/80">{story.detail}</p>
           </div>

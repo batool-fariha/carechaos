@@ -25,3 +25,22 @@ test("no serious accessibility violations on a finished run and results page", a
   res = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
   expect(res.violations.filter((v) => ["serious", "critical"].includes(v.impact ?? "")).map((v) => `${v.id}: ${v.nodes[0].target.join(" ")}`)).toEqual([]);
 });
+
+test("screen-reader text: no ticking clock in the live region, stable node names, charts described", async ({ page }) => {
+  await page.goto("/lab");
+  await page.getByTestId("run-demo").click();
+  await expect(page.getByTestId("run-state")).toHaveAttribute("data-state", "running");
+  // the clock updates many times a second; inside a live region every tick would be announced
+  expect(await page.locator("[aria-live] [data-testid=clock]").count()).toBe(0);
+  // a focused pipeline node keeps its name while its queue depth changes
+  const node = page.getByTestId("node-ingestion");
+  const name1 = await node.getAttribute("aria-label");
+  await page.waitForTimeout(1500);
+  expect(await node.getAttribute("aria-label")).toBe(name1);
+  expect(name1).not.toMatch(/\d/);
+  await page.getByTestId("ctl-skip").click();
+  await page.getByTestId("view-results").click();
+  await page.getByTestId("results").waitFor();
+  await expect(page.getByText(/Queue depth (peaked at|No events were queued)/).first()).toBeAttached();
+  await expect(page.getByText(/^Ingestion API: (healthy throughout|.*for \d+s)/).first()).toBeAttached();
+});

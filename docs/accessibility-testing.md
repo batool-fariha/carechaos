@@ -15,8 +15,9 @@ Write down the screen reader, browser and version when you report.
 These are likely problems. Please confirm or refute each while you test.
 
 - [ ] **Table names and column scope.** Every table now has a screen-reader-only `<caption>` and `scope="col"` on its header cells (they had neither before). Please confirm: the rotor or element list names each table sensibly, and moving across a row announces the column header. Check the "Event counts by outcome" table too, which has no header row, so each row is a status and a count.
-- [ ] **Pipeline topology** is an SVG group of buttons. Each button's label carries the service, its health and queue depth. Check that it reads sensibly, and whether a changing queue depth is announced (it should not be noisy).
-- [ ] **Run state** has `aria-live="polite"`. Check that "running", "paused" and "completed" are announced once each, not repeatedly.
+- [ ] **Pipeline topology** is an SVG group of buttons. Each button's name is the service and its health (for example "Ingestion API: Degraded"), and its description carries the queue depth. The name only changes when health changes, so a focused node shouldn't be re-announced on every tick. Check that this holds in your screen reader.
+- [ ] **Run state** has `aria-live="polite"`. The ticking clock was moved out of it. Check that "running", "paused" and "completed" are each announced once, and that the clock is not announced.
+- [ ] **Charts** are hidden from screen readers, and each has a text summary in its place: peak and final queue depth, mean and peak latency, final counts, and time each service spent unhealthy. Check that the summaries are read after each chart's heading and make sense without the picture.
 
 ## 1. Landing page (`/`)
 

@@ -48,7 +48,10 @@ export function Topology({ result, selected, onSelect }: { result: SimulationRes
               role="button"
               tabIndex={0}
               aria-pressed={sel}
-              aria-label={`${SERVICE_LABELS[id]}: ${meta.label}, ${s.queueDepth} waiting. Open details.`}
+              // The name only changes when health changes. Queue depth changes every tick, so it goes in the
+              // description, which screen readers read on focus but do not re-announce on every update.
+              aria-label={`${SERVICE_LABELS[id]}: ${meta.label}`}
+              aria-description={`${s.queueDepth} waiting. Shows details.`}
               data-testid={`node-${id}`}
               data-health={s.health}
               onClick={() => onSelect(id)}
